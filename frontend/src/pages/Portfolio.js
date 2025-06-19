@@ -1,88 +1,90 @@
 import React, { useState, useEffect } from 'react';
-import StockCard from '../components/StockCard';
 import { PlusIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 const Portfolio = () => {
   const [portfolio, setPortfolio] = useState([]);
-  const [newStock, setNewStock] = useState({ symbol: '', shares: '', avgPrice: '' });
+  const [newStock, setNewStock] = useState({ symbol: '', shares: '', price: '' });
   const [loading, setLoading] = useState(true);
 
-  // Mock portfolio data
+  // Mock portfolio data with purchases
   useEffect(() => {
     const mockPortfolio = [
       {
         symbol: 'AAPL',
         name: 'Apple Inc.',
-        shares: 10,
-        avgPrice: 145.50,
         currentPrice: 150.25,
         change: 2.15,
         changePercent: 1.45,
         volume: 45678900,
-        marketCap: 2500000000000
+        marketCap: 2500000000000,
+        purchases: [
+          { shares: 10, price: 145.5, date: '2024-06-01' }
+        ]
       },
       {
         symbol: 'MSFT',
         name: 'Microsoft Corporation',
-        shares: 5,
-        avgPrice: 310.00,
         currentPrice: 320.45,
         change: 8.75,
         changePercent: 2.81,
         volume: 34567800,
-        marketCap: 2400000000000
+        marketCap: 2400000000000,
+        purchases: [
+          { shares: 5, price: 310.0, date: '2024-06-02' }
+        ]
       },
       {
         symbol: 'GOOGL',
         name: 'Alphabet Inc.',
-        shares: 3,
-        avgPrice: 2800.00,
         currentPrice: 2750.80,
         change: -15.20,
         changePercent: -0.55,
         volume: 23456700,
-        marketCap: 1800000000000
+        marketCap: 1800000000000,
+        purchases: [
+          { shares: 3, price: 2800.0, date: '2024-06-03' }
+        ]
       }
     ];
-
     setPortfolio(mockPortfolio);
     setLoading(false);
   }, []);
 
+  // Add or buy more shares of a stock
   const handleAddStock = (e) => {
     e.preventDefault();
-    const { symbol, shares, avgPrice } = newStock;
-    
-    if (!symbol.trim() || !shares || !avgPrice) {
+    const { symbol, shares, price } = newStock;
+    if (!symbol.trim() || !shares || !price) {
       toast.error('Please fill in all fields');
       return;
     }
-
     const stockSymbol = symbol.trim().toUpperCase();
-    
-    // Check if already in portfolio
-    if (portfolio.some(stock => stock.symbol === stockSymbol)) {
-      toast.error(`${stockSymbol} is already in your portfolio`);
-      return;
+    const today = new Date().toISOString().slice(0, 10);
+    const purchase = { shares: parseInt(shares), price: parseFloat(price), date: today };
+    const stockIndex = portfolio.findIndex(stock => stock.symbol === stockSymbol);
+    if (stockIndex !== -1) {
+      // Add purchase to existing stock
+      const updatedPortfolio = [...portfolio];
+      updatedPortfolio[stockIndex].purchases.push(purchase);
+      setPortfolio(updatedPortfolio);
+      toast.success(`Bought more shares of ${stockSymbol}`);
+    } else {
+      // Add new stock
+      const newStockData = {
+        symbol: stockSymbol,
+        name: `${stockSymbol} Corporation`,
+        currentPrice: Math.random() * 1000 + 50,
+        change: (Math.random() - 0.5) * 20,
+        changePercent: (Math.random() - 0.5) * 10,
+        volume: Math.floor(Math.random() * 100000000),
+        marketCap: Math.floor(Math.random() * 1000000000000),
+        purchases: [purchase]
+      };
+      setPortfolio([...portfolio, newStockData]);
+      toast.success(`${stockSymbol} added to portfolio`);
     }
-
-    // Mock new stock data
-    const newStockData = {
-      symbol: stockSymbol,
-      name: `${stockSymbol} Corporation`,
-      shares: parseInt(shares),
-      avgPrice: parseFloat(avgPrice),
-      currentPrice: Math.random() * 1000 + 50,
-      change: (Math.random() - 0.5) * 20,
-      changePercent: (Math.random() - 0.5) * 10,
-      volume: Math.floor(Math.random() * 100000000),
-      marketCap: Math.floor(Math.random() * 1000000000000)
-    };
-
-    setPortfolio([...portfolio, newStockData]);
-    setNewStock({ symbol: '', shares: '', avgPrice: '' });
-    toast.success(`${stockSymbol} added to portfolio`);
+    setNewStock({ symbol: '', shares: '', price: '' });
   };
 
   const handleRemoveStock = (symbol) => {
@@ -90,22 +92,21 @@ const Portfolio = () => {
     toast.success(`${symbol} removed from portfolio`);
   };
 
+  // Calculate stats
   const calculatePortfolioStats = () => {
     if (portfolio.length === 0) return null;
-
-    const totalInvested = portfolio.reduce((sum, stock) => sum + (stock.shares * stock.avgPrice), 0);
-    const totalCurrent = portfolio.reduce((sum, stock) => sum + (stock.shares * stock.currentPrice), 0);
+    let totalInvested = 0;
+    let totalCurrent = 0;
+    portfolio.forEach(stock => {
+      const totalShares = stock.purchases.reduce((sum, p) => sum + p.shares, 0);
+      const avgPrice = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0) / (totalShares || 1);
+      totalInvested += stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0);
+      totalCurrent += totalShares * stock.currentPrice;
+    });
     const totalGainLoss = totalCurrent - totalInvested;
     const totalGainLossPercent = (totalGainLoss / totalInvested) * 100;
-
-    return {
-      totalInvested,
-      totalCurrent,
-      totalGainLoss,
-      totalGainLossPercent
-    };
+    return { totalInvested, totalCurrent, totalGainLoss, totalGainLossPercent };
   };
-
   const stats = calculatePortfolioStats();
 
   if (loading) {
@@ -125,7 +126,6 @@ const Portfolio = () => {
           <p className="mt-2 text-gray-600">Track your investments and performance</p>
         </div>
       </div>
-
       {/* Portfolio Summary */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -159,10 +159,9 @@ const Portfolio = () => {
           </div>
         </div>
       )}
-
       {/* Add Stock Form */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Stock to Portfolio</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Buy Shares / Add Stock to Portfolio</h2>
         <form onSubmit={handleAddStock} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input
             type="text"
@@ -181,9 +180,9 @@ const Portfolio = () => {
           <input
             type="number"
             step="0.01"
-            placeholder="Avg Price"
-            value={newStock.avgPrice}
-            onChange={(e) => setNewStock({ ...newStock, avgPrice: e.target.value })}
+            placeholder="Unit Price"
+            value={newStock.price}
+            onChange={(e) => setNewStock({ ...newStock, price: e.target.value })}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
           <button
@@ -191,11 +190,10 @@ const Portfolio = () => {
             className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
           >
             <PlusIcon className="w-5 h-5 mr-2" />
-            Add
+            Buy/Add
           </button>
         </form>
       </div>
-
       {/* Portfolio Holdings */}
       {portfolio.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -212,14 +210,14 @@ const Portfolio = () => {
               Holdings ({portfolio.length} stocks)
             </h2>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {portfolio.map((stock) => {
-              const totalInvested = stock.shares * stock.avgPrice;
-              const currentValue = stock.shares * stock.currentPrice;
+              const totalShares = stock.purchases.reduce((sum, p) => sum + p.shares, 0);
+              const avgPrice = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0) / (totalShares || 1);
+              const totalInvested = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0);
+              const currentValue = totalShares * stock.currentPrice;
               const gainLoss = currentValue - totalInvested;
               const gainLossPercent = (gainLoss / totalInvested) * 100;
-
               return (
                 <div key={stock.symbol} className="relative">
                   <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
@@ -227,10 +225,21 @@ const Portfolio = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">{stock.symbol}</h3>
                         <p className="text-sm text-gray-600 truncate max-w-48">{stock.name}</p>
-                        <p className="text-sm text-gray-500">{stock.shares} shares @ ${stock.avgPrice}</p>
+                        <p className="text-sm text-gray-500">{totalShares} shares @ ${avgPrice.toFixed(2)} avg</p>
+                        <div className="mt-2">
+                          <h4 className="font-semibold text-gray-700 text-xs mb-1">Purchases:</h4>
+                          <ul className="text-xs text-gray-600 space-y-1">
+                            {stock.purchases.map((p, idx) => (
+                              <li key={idx} className="flex justify-between">
+                                <span>{p.shares} shares @ ${p.price.toFixed(2)}</span>
+                                <span className="ml-2">{p.date}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold text-gray-900">${stock.currentPrice}</p>
+                        <p className="text-xl font-bold text-gray-900">${stock.currentPrice.toFixed(2)}</p>
                         <div className={`flex items-center text-sm font-medium ${
                           stock.change >= 0 ? 'text-success-600' : 'text-danger-600'
                         }`}>
@@ -238,7 +247,6 @@ const Portfolio = () => {
                         </div>
                       </div>
                     </div>
-
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-500">Total Invested</span>
