@@ -1,281 +1,311 @@
 import React, { useState, useEffect } from 'react';
-import { PlusIcon, TrashIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { portfolioAPI, stockAPI } from '../utils/api';
+import StockCard from '../components/StockCard';
+import { BriefcaseIcon, PlusIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 const Portfolio = () => {
   const [portfolio, setPortfolio] = useState([]);
-  const [newStock, setNewStock] = useState({ symbol: '', shares: '', price: '' });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStock, setNewStock] = useState({
+    symbol: '',
+    shares: '',
+    price: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [addingStock, setAddingStock] = useState(false);
 
-  // Mock portfolio data with purchases
   useEffect(() => {
-    const mockPortfolio = [
-      {
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        currentPrice: 150.25,
-        change: 2.15,
-        changePercent: 1.45,
-        volume: 45678900,
-        marketCap: 2500000000000,
-        purchases: [
-          { shares: 10, price: 145.5, date: '2024-06-01' }
-        ]
-      },
-      {
-        symbol: 'MSFT',
-        name: 'Microsoft Corporation',
-        currentPrice: 320.45,
-        change: 8.75,
-        changePercent: 2.81,
-        volume: 34567800,
-        marketCap: 2400000000000,
-        purchases: [
-          { shares: 5, price: 310.0, date: '2024-06-02' }
-        ]
-      },
-      {
-        symbol: 'GOOGL',
-        name: 'Alphabet Inc.',
-        currentPrice: 2750.80,
-        change: -15.20,
-        changePercent: -0.55,
-        volume: 23456700,
-        marketCap: 1800000000000,
-        purchases: [
-          { shares: 3, price: 2800.0, date: '2024-06-03' }
-        ]
-      }
-    ];
-    setPortfolio(mockPortfolio);
-    setLoading(false);
+    fetchPortfolio();
   }, []);
 
-  // Add or buy more shares of a stock
-  const handleAddStock = (e) => {
+  const fetchPortfolio = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await portfolioAPI.getPortfolio();
+      setPortfolio(response.data);
+    } catch (err) {
+      console.error('Error fetching portfolio:', err);
+      setError('Failed to load portfolio. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddStock = async (e) => {
     e.preventDefault();
-    const { symbol, shares, price } = newStock;
-    if (!symbol.trim() || !shares || !price) {
+    if (!newStock.symbol.trim() || !newStock.shares || !newStock.price) {
       toast.error('Please fill in all fields');
       return;
     }
-    const stockSymbol = symbol.trim().toUpperCase();
-    const today = new Date().toISOString().slice(0, 10);
-    const purchase = { shares: parseInt(shares), price: parseFloat(price), date: today };
-    const stockIndex = portfolio.findIndex(stock => stock.symbol === stockSymbol);
-    if (stockIndex !== -1) {
-      // Add purchase to existing stock
-      const updatedPortfolio = [...portfolio];
-      updatedPortfolio[stockIndex].purchases.push(purchase);
-      setPortfolio(updatedPortfolio);
-      toast.success(`Bought more shares of ${stockSymbol}`);
-    } else {
-      // Add new stock
-      const newStockData = {
-        symbol: stockSymbol,
-        name: `${stockSymbol} Corporation`,
-        currentPrice: Math.random() * 1000 + 50,
-        change: (Math.random() - 0.5) * 20,
-        changePercent: (Math.random() - 0.5) * 10,
-        volume: Math.floor(Math.random() * 100000000),
-        marketCap: Math.floor(Math.random() * 1000000000000),
-        purchases: [purchase]
+
+    try {
+      setAddingStock(true);
+      const stockData = {
+        symbol: newStock.symbol.toUpperCase(),
+        shares: parseFloat(newStock.shares),
+        price: parseFloat(newStock.price),
+        date: newStock.date
       };
-      setPortfolio([...portfolio, newStockData]);
-      toast.success(`${stockSymbol} added to portfolio`);
+      
+      await portfolioAPI.addStock(stockData);
+      toast.success(`${stockData.symbol} added to portfolio`);
+      setNewStock({
+        symbol: '',
+        shares: '',
+        price: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      setShowAddModal(false);
+      fetchPortfolio(); // Refresh the portfolio
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to add stock to portfolio';
+      toast.error(message);
+    } finally {
+      setAddingStock(false);
     }
-    setNewStock({ symbol: '', shares: '', price: '' });
   };
 
-  const handleRemoveStock = (symbol) => {
-    setPortfolio(portfolio.filter(stock => stock.symbol !== symbol));
-    toast.success(`${symbol} removed from portfolio`);
+  const handleRemoveStock = async (symbol) => {
+    try {
+      await portfolioAPI.removeStock(symbol);
+      toast.success(`${symbol} removed from portfolio`);
+      setPortfolio(portfolio.filter(stock => stock.symbol !== symbol));
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to remove stock from portfolio';
+      toast.error(message);
+    }
   };
 
-  // Calculate stats
-  const calculatePortfolioStats = () => {
-    if (portfolio.length === 0) return null;
-    let totalInvested = 0;
-    let totalCurrent = 0;
-    portfolio.forEach(stock => {
-      const totalShares = stock.purchases.reduce((sum, p) => sum + p.shares, 0);
-      const avgPrice = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0) / (totalShares || 1);
-      totalInvested += stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0);
-      totalCurrent += totalShares * stock.currentPrice;
-    });
-    const totalGainLoss = totalCurrent - totalInvested;
-    const totalGainLossPercent = (totalGainLoss / totalInvested) * 100;
-    return { totalInvested, totalCurrent, totalGainLoss, totalGainLossPercent };
+  const calculateTotalValue = () => {
+    return portfolio.reduce((total, stock) => {
+      const totalShares = stock.purchases.reduce((sum, purchase) => sum + purchase.shares, 0);
+      return total + (totalShares * stock.current_price);
+    }, 0);
   };
-  const stats = calculatePortfolioStats();
+
+  const calculateTotalGainLoss = () => {
+    return portfolio.reduce((total, stock) => {
+      const totalShares = stock.purchases.reduce((sum, purchase) => sum + purchase.shares, 0);
+      const totalCost = stock.purchases.reduce((sum, purchase) => sum + (purchase.shares * purchase.price), 0);
+      const currentValue = totalShares * stock.current_price;
+      return total + (currentValue - totalCost);
+    }, 0);
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-4">{error}</div>
+          <button
+            onClick={fetchPortfolio}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const totalValue = calculateTotalValue();
+  const totalGainLoss = calculateTotalGainLoss();
+  const totalGainLossPercent = totalValue > 0 ? (totalGainLoss / (totalValue - totalGainLoss)) * 100 : 0;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Portfolio</h1>
-          <p className="mt-2 text-gray-600">Track your investments and performance</p>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+            <BriefcaseIcon className="w-8 h-8 mr-3" />
+            Portfolio
+          </h1>
+          <p className="mt-2 text-gray-600">Manage your investments</p>
         </div>
+        
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+          <PlusIcon className="w-5 h-5 mr-2" />
+          Add Stock
+        </button>
       </div>
+
       {/* Portfolio Summary */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Invested</h3>
-            <p className="text-2xl font-bold text-gray-900">
-              ${stats.totalInvested.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Current Value</h3>
-            <p className="text-2xl font-bold text-gray-900">
-              ${stats.totalCurrent.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Gain/Loss</h3>
-            <p className={`text-2xl font-bold ${
-              stats.totalGainLoss >= 0 ? 'text-success-600' : 'text-danger-600'
-            }`}>
-              {stats.totalGainLoss >= 0 ? '+' : ''}${stats.totalGainLoss.toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Return %</h3>
-            <p className={`text-2xl font-bold ${
-              stats.totalGainLossPercent >= 0 ? 'text-success-600' : 'text-danger-600'
-            }`}>
-              {stats.totalGainLossPercent >= 0 ? '+' : ''}{stats.totalGainLossPercent.toFixed(2)}%
-            </p>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Value</h3>
+          <p className="text-3xl font-bold text-gray-900">${totalValue.toLocaleString()}</p>
         </div>
-      )}
-      {/* Add Stock Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Buy Shares / Add Stock to Portfolio</h2>
-        <form onSubmit={handleAddStock} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
-            type="text"
-            placeholder="Symbol (e.g., AAPL)"
-            value={newStock.symbol}
-            onChange={(e) => setNewStock({ ...newStock, symbol: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <input
-            type="number"
-            placeholder="Shares"
-            value={newStock.shares}
-            onChange={(e) => setNewStock({ ...newStock, shares: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <input
-            type="number"
-            step="0.01"
-            placeholder="Unit Price"
-            value={newStock.price}
-            onChange={(e) => setNewStock({ ...newStock, price: e.target.value })}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <button
-            type="submit"
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
-          >
-            <PlusIcon className="w-5 h-5 mr-2" />
-            Buy/Add
-          </button>
-        </form>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Gain/Loss</h3>
+          <p className={`text-3xl font-bold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {totalGainLoss >= 0 ? '+' : ''}${totalGainLoss.toLocaleString()}
+          </p>
+          <p className={`text-sm ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {totalGainLoss >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Total Stocks</h3>
+          <p className="text-3xl font-bold text-gray-900">{portfolio.length}</p>
+        </div>
       </div>
-      {/* Portfolio Holdings */}
+
+      {/* Portfolio Content */}
       {portfolio.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ChartBarIcon className="w-8 h-8 text-gray-400" />
+        <div className="text-center py-12">
+          <BriefcaseIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No stocks in portfolio</h3>
+          <p className="mt-1 text-sm text-gray-500">Get started by adding some stocks to your portfolio.</p>
+          <div className="mt-6">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Add Stock
+            </button>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Your portfolio is empty</h3>
-          <p className="text-gray-600 mb-4">Add stocks to your portfolio to track your investments</p>
         </div>
       ) : (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Holdings ({portfolio.length} stocks)
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {portfolio.map((stock) => {
-              const totalShares = stock.purchases.reduce((sum, p) => sum + p.shares, 0);
-              const avgPrice = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0) / (totalShares || 1);
-              const totalInvested = stock.purchases.reduce((sum, p) => sum + p.shares * p.price, 0);
-              const currentValue = totalShares * stock.currentPrice;
-              const gainLoss = currentValue - totalInvested;
-              const gainLossPercent = (gainLoss / totalInvested) * 100;
-              return (
-                <div key={stock.symbol} className="relative">
-                  <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{stock.symbol}</h3>
-                        <p className="text-sm text-gray-600 truncate max-w-48">{stock.name}</p>
-                        <p className="text-sm text-gray-500">{totalShares} shares @ ${avgPrice.toFixed(2)} avg</p>
-                        <div className="mt-2">
-                          <h4 className="font-semibold text-gray-700 text-xs mb-1">Purchases:</h4>
-                          <ul className="text-xs text-gray-600 space-y-1">
-                            {stock.purchases.map((p, idx) => (
-                              <li key={idx} className="flex justify-between">
-                                <span>{p.shares} shares @ ${p.price.toFixed(2)}</span>
-                                <span className="ml-2">{p.date}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-gray-900">${stock.currentPrice.toFixed(2)}</p>
-                        <div className={`flex items-center text-sm font-medium ${
-                          stock.change >= 0 ? 'text-success-600' : 'text-danger-600'
-                        }`}>
-                          {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Total Invested</span>
-                        <span className="font-medium">${totalInvested.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Current Value</span>
-                        <span className="font-medium">${currentValue.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Gain/Loss</span>
-                        <span className={`font-medium ${
-                          gainLoss >= 0 ? 'text-success-600' : 'text-danger-600'
-                        }`}>
-                          {gainLoss >= 0 ? '+' : ''}${gainLoss.toFixed(2)} ({gainLossPercent.toFixed(2)}%)
-                        </span>
-                      </div>
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {portfolio.map((stock) => (
+            <div key={stock.symbol} className="relative">
+              <StockCard stock={stock} />
+              <button
+                onClick={() => handleRemoveStock(stock.symbol)}
+                className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                title="Remove from portfolio"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              
+              {/* Purchase Details */}
+              <div className="mt-2 bg-white rounded-lg shadow-sm p-3">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Purchase History</h4>
+                {stock.purchases.map((purchase, index) => (
+                  <div key={index} className="text-xs text-gray-600 mb-1">
+                    {purchase.date}: {purchase.shares} shares @ ${purchase.price}
                   </div>
+                ))}
+                <div className="text-sm font-medium text-gray-900 mt-2">
+                  Avg Price: ${(stock.purchases.reduce((sum, p) => sum + (p.shares * p.price), 0) / 
+                    stock.purchases.reduce((sum, p) => sum + p.shares, 0)).toFixed(2)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Stock Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Stock to Portfolio</h3>
+              <form onSubmit={handleAddStock}>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 mb-2">
+                      Stock Symbol
+                    </label>
+                    <input
+                      type="text"
+                      id="symbol"
+                      value={newStock.symbol}
+                      onChange={(e) => setNewStock({...newStock, symbol: e.target.value})}
+                      placeholder="e.g., AAPL"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="shares" className="block text-sm font-medium text-gray-700 mb-2">
+                      Number of Shares
+                    </label>
+                    <input
+                      type="number"
+                      id="shares"
+                      value={newStock.shares}
+                      onChange={(e) => setNewStock({...newStock, shares: e.target.value})}
+                      placeholder="e.g., 10"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                      Purchase Price per Share
+                    </label>
+                    <input
+                      type="number"
+                      id="price"
+                      value={newStock.price}
+                      onChange={(e) => setNewStock({...newStock, price: e.target.value})}
+                      placeholder="e.g., 150.25"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+                      Purchase Date
+                    </label>
+                    <input
+                      type="date"
+                      id="date"
+                      value={newStock.date}
+                      onChange={(e) => setNewStock({...newStock, date: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
                   <button
-                    onClick={() => handleRemoveStock(stock.symbol)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                    title="Remove from portfolio"
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
                   >
-                    <TrashIcon className="w-4 h-4" />
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingStock}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {addingStock ? 'Adding...' : 'Add Stock'}
                   </button>
                 </div>
-              );
-            })}
+              </form>
+            </div>
           </div>
         </div>
       )}

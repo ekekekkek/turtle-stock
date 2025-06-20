@@ -1,207 +1,284 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { stockAPI, watchlistAPI, portfolioAPI } from '../utils/api';
 import StockChart from '../components/StockChart';
-import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/solid';
+import { ArrowLeftIcon, PlusIcon, EyeIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const StockDetails = () => {
   const { symbol } = useParams();
-  const [timeRange, setTimeRange] = useState('1D');
-  const [stockData, setStockData] = useState(null);
+  const [stock, setStock] = useState(null);
+  const [chartData, setChartData] = useState([]);
+  const [timeRange, setTimeRange] = useState('1d');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [isInPortfolio, setIsInPortfolio] = useState(false);
 
-  // Mock data for demonstration
   useEffect(() => {
-    const mockStockData = {
-      symbol: symbol,
-      name: 'Apple Inc.',
-      price: 150.25,
-      change: 2.15,
-      changePercent: 1.45,
-      volume: 45678900,
-      marketCap: 2500000000000,
-      pe: 25.5,
-      dividend: 0.88,
-      dividendYield: 0.58,
-      high: 152.30,
-      low: 148.90,
-      open: 149.10,
-      previousClose: 148.10,
-      beta: 1.2,
-      eps: 5.89,
-      sector: 'Technology',
-      industry: 'Consumer Electronics'
-    };
-
-    setStockData(mockStockData);
-    setLoading(false);
+    if (symbol) {
+      fetchStockData();
+      checkStockStatus();
+    }
   }, [symbol]);
 
-  const mockChartData = [
-    { timestamp: '2024-01-01T09:30:00', price: 148.50 },
-    { timestamp: '2024-01-01T10:30:00', price: 149.20 },
-    { timestamp: '2024-01-01T11:30:00', price: 150.10 },
-    { timestamp: '2024-01-01T12:30:00', price: 149.80 },
-    { timestamp: '2024-01-01T13:30:00', price: 150.25 },
-    { timestamp: '2024-01-01T14:30:00', price: 151.00 },
-    { timestamp: '2024-01-01T15:30:00', price: 150.75 },
-    { timestamp: '2024-01-01T16:00:00', price: 150.25 }
-  ];
+  const fetchStockData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [quoteResponse, infoResponse, historyResponse] = await Promise.all([
+        stockAPI.getQuote(symbol),
+        stockAPI.getInfo(symbol),
+        stockAPI.getHistory(symbol, timeRange, '1m')
+      ]);
+      
+      setStock({
+        ...quoteResponse.data,
+        ...infoResponse.data
+      });
+      setChartData(historyResponse.data);
+    } catch (err) {
+      console.error('Error fetching stock data:', err);
+      setError('Failed to load stock data. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const timeRanges = ['1D', '1W', '1M', '3M', '1Y', '5Y'];
+  const checkStockStatus = async () => {
+    try {
+      // Check if stock is in watchlist and portfolio
+      const [watchlistResponse, portfolioResponse] = await Promise.all([
+        watchlistAPI.getWatchlist(),
+        portfolioAPI.getPortfolio()
+      ]);
+      
+      setIsInWatchlist(watchlistResponse.data.some(stock => stock.symbol === symbol));
+      setIsInPortfolio(portfolioResponse.data.some(stock => stock.symbol === symbol));
+    } catch (err) {
+      console.error('Error checking stock status:', err);
+    }
+  };
+
+  const handleAddToWatchlist = async () => {
+    try {
+      await watchlistAPI.addStock(symbol);
+      setIsInWatchlist(true);
+      toast.success(`${symbol} added to watchlist`);
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to add to watchlist';
+      toast.error(message);
+    }
+  };
+
+  const handleRemoveFromWatchlist = async () => {
+    try {
+      await watchlistAPI.removeStock(symbol);
+      setIsInWatchlist(false);
+      toast.success(`${symbol} removed from watchlist`);
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to remove from watchlist';
+      toast.error(message);
+    }
+  };
+
+  const handleTimeRangeChange = (newTimeRange) => {
+    setTimeRange(newTimeRange);
+    // Fetch new chart data
+    stockAPI.getHistory(symbol, newTimeRange, '1m')
+      .then(response => setChartData(response.data))
+      .catch(err => console.error('Error fetching chart data:', err));
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
-  if (!stockData) {
+  if (error) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Not Found</h2>
-        <p className="text-gray-600">The stock symbol "{symbol}" could not be found.</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-4">{error}</div>
+          <button
+            onClick={fetchStockData}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
 
-  const isPositive = stockData.change >= 0;
-  const formattedPrice = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(stockData.price);
+  if (!stock) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-600 text-lg mb-4">Stock not found</div>
+          <Link
+            to="/"
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  const formattedChange = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(Math.abs(stockData.change));
+  const timeRanges = [
+    { label: '1D', value: '1d' },
+    { label: '1W', value: '5d' },
+    { label: '1M', value: '1mo' },
+    { label: '3M', value: '3mo' },
+    { label: '1Y', value: '1y' },
+    { label: '5Y', value: '5y' }
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Stock Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Link
+            to="/"
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeftIcon className="w-6 h-6" />
+          </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{stockData.symbol}</h1>
-            <p className="text-lg text-gray-600">{stockData.name}</p>
-            <p className="text-sm text-gray-500">{stockData.sector} • {stockData.industry}</p>
+            <h1 className="text-3xl font-bold text-gray-900">{stock.symbol}</h1>
+            <p className="text-gray-600">{stock.name}</p>
           </div>
-          <div className="mt-4 lg:mt-0 text-right">
-            <p className="text-4xl font-bold text-gray-900">{formattedPrice}</p>
-            <div className={`flex items-center justify-end text-lg font-medium ${
-              isPositive ? 'text-success-600' : 'text-danger-600'
-            }`}>
-              {isPositive ? (
-                <ArrowUpIcon className="w-5 h-5 mr-1" />
-              ) : (
-                <ArrowDownIcon className="w-5 h-5 mr-1" />
-              )}
-              {formattedChange} ({stockData.changePercent.toFixed(2)}%)
-            </div>
-          </div>
+        </div>
+        
+        <div className="flex space-x-2">
+          {isInWatchlist ? (
+            <button
+              onClick={handleRemoveFromWatchlist}
+              className="inline-flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
+            >
+              <EyeIcon className="w-5 h-5 mr-2" />
+              Remove from Watchlist
+            </button>
+          ) : (
+            <button
+              onClick={handleAddToWatchlist}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Add to Watchlist
+            </button>
+          )}
+          
+          {isInPortfolio && (
+            <Link
+              to="/portfolio"
+              className="inline-flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
+            >
+              <BriefcaseIcon className="w-5 h-5 mr-2" />
+              View in Portfolio
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Chart Section */}
+      {/* Stock Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Current Price</h3>
+          <p className="text-3xl font-bold text-gray-900">${stock.price?.toFixed(2) || 'N/A'}</p>
+          {stock.change !== undefined && stock.changePercent !== undefined && (
+            <p className={`text-lg font-medium ${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
+            </p>
+          )}
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Market Cap</h3>
+          <p className="text-2xl font-bold text-gray-900">
+            {stock.market_cap ? `$${(stock.market_cap / 1e9).toFixed(2)}B` : 'N/A'}
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Volume</h3>
+          <p className="text-2xl font-bold text-gray-900">
+            {stock.volume ? stock.volume.toLocaleString() : 'N/A'}
+          </p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">52W Range</h3>
+          <p className="text-lg font-medium text-gray-900">
+            {stock.fifty_two_week_low && stock.fifty_two_week_high 
+              ? `$${stock.fifty_two_week_low.toFixed(2)} - $${stock.fifty_two_week_high.toFixed(2)}`
+              : 'N/A'
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Chart */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Price Chart</h2>
           <div className="flex space-x-2">
             {timeRanges.map((range) => (
               <button
-                key={range}
-                onClick={() => setTimeRange(range)}
+                key={range.value}
+                onClick={() => handleTimeRangeChange(range.value)}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  timeRange === range
+                  timeRange === range.value
                     ? 'bg-primary-100 text-primary-700'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                {range}
+                {range.label}
               </button>
             ))}
           </div>
         </div>
-        <StockChart data={mockChartData} symbol={symbol} timeRange={timeRange} />
+        <StockChart data={chartData} symbol={symbol} timeRange={timeRange} />
       </div>
 
-      {/* Stock Information Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Key Statistics */}
+      {/* Additional Info */}
+      {stock.description && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Statistics</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Market Cap</span>
-              <span className="font-medium">
-                ${(stockData.marketCap / 1000000000).toFixed(2)}B
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">P/E Ratio</span>
-              <span className="font-medium">{stockData.pe}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">EPS</span>
-              <span className="font-medium">${stockData.eps}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Beta</span>
-              <span className="font-medium">{stockData.beta}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Dividend Yield</span>
-              <span className="font-medium">{stockData.dividendYield}%</span>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">About {stock.name}</h3>
+          <p className="text-gray-700 leading-relaxed">{stock.description}</p>
         </div>
+      )}
 
-        {/* Trading Information */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trading Information</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Open</span>
-              <span className="font-medium">${stockData.open}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Previous Close</span>
-              <span className="font-medium">${stockData.previousClose}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Day High</span>
-              <span className="font-medium">${stockData.high}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Day Low</span>
-              <span className="font-medium">${stockData.low}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Volume</span>
-              <span className="font-medium">
-                {new Intl.NumberFormat('en-US', {
-                  notation: 'compact',
-                  maximumFractionDigits: 1,
-                }).format(stockData.volume)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Company Description */}
+      {/* Key Statistics */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">About {stockData.name}</h3>
-        <p className="text-gray-600 leading-relaxed">
-          {stockData.name} is a leading technology company that designs, manufactures, and markets 
-          smartphones, personal computers, tablets, wearables, and accessories worldwide. The company 
-          offers iPhone, Mac, iPad, and wearables, home, and accessories. It also provides digital 
-          content, applications, and various cloud services. The company serves consumers, small and 
-          mid-sized businesses, and education, enterprise, and government customers.
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Statistics</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {stock.pe_ratio && (
+            <div>
+              <p className="text-sm text-gray-600">P/E Ratio</p>
+              <p className="text-lg font-semibold text-gray-900">{stock.pe_ratio.toFixed(2)}</p>
+            </div>
+          )}
+          {stock.dividend_yield && (
+            <div>
+              <p className="text-sm text-gray-600">Dividend Yield</p>
+              <p className="text-lg font-semibold text-gray-900">{(stock.dividend_yield * 100).toFixed(2)}%</p>
+            </div>
+          )}
+          {stock.beta && (
+            <div>
+              <p className="text-sm text-gray-600">Beta</p>
+              <p className="text-lg font-semibold text-gray-900">{stock.beta.toFixed(2)}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

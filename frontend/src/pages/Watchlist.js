@@ -1,98 +1,93 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { watchlistAPI, stockAPI } from '../utils/api';
 import StockCard from '../components/StockCard';
-import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 const Watchlist = () => {
   const [watchlist, setWatchlist] = useState([]);
-  const [newSymbol, setNewSymbol] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStockSymbol, setNewStockSymbol] = useState('');
+  const [addingStock, setAddingStock] = useState(false);
 
-  // Mock watchlist data
   useEffect(() => {
-    const mockWatchlist = [
-      {
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        price: 150.25,
-        change: 2.15,
-        changePercent: 1.45,
-        volume: 45678900,
-        marketCap: 2500000000000
-      },
-      {
-        symbol: 'GOOGL',
-        name: 'Alphabet Inc.',
-        price: 2750.80,
-        change: -15.20,
-        changePercent: -0.55,
-        volume: 23456700,
-        marketCap: 1800000000000
-      },
-      {
-        symbol: 'MSFT',
-        name: 'Microsoft Corporation',
-        price: 320.45,
-        change: 8.75,
-        changePercent: 2.81,
-        volume: 34567800,
-        marketCap: 2400000000000
-      },
-      {
-        symbol: 'TSLA',
-        name: 'Tesla, Inc.',
-        price: 850.30,
-        change: -25.70,
-        changePercent: -2.94,
-        volume: 56789000,
-        marketCap: 850000000000
-      }
-    ];
-
-    setWatchlist(mockWatchlist);
-    setLoading(false);
+    fetchWatchlist();
   }, []);
 
-  const handleAddStock = (e) => {
+  const fetchWatchlist = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await watchlistAPI.getQuotes();
+      setWatchlist(response.data);
+    } catch (err) {
+      console.error('Error fetching watchlist:', err);
+      setError('Failed to load watchlist. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddStock = async (e) => {
     e.preventDefault();
-    if (!newSymbol.trim()) {
-      toast.error('Please enter a stock symbol');
-      return;
+    if (!newStockSymbol.trim()) return;
+
+    try {
+      setAddingStock(true);
+      await watchlistAPI.addStock(newStockSymbol.toUpperCase());
+      toast.success(`${newStockSymbol.toUpperCase()} added to watchlist`);
+      setNewStockSymbol('');
+      setShowAddModal(false);
+      fetchWatchlist(); // Refresh the watchlist
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to add stock to watchlist';
+      toast.error(message);
+    } finally {
+      setAddingStock(false);
     }
-
-    const symbol = newSymbol.trim().toUpperCase();
-    
-    // Check if already in watchlist
-    if (watchlist.some(stock => stock.symbol === symbol)) {
-      toast.error(`${symbol} is already in your watchlist`);
-      return;
-    }
-
-    // Mock new stock data
-    const newStock = {
-      symbol: symbol,
-      name: `${symbol} Corporation`,
-      price: Math.random() * 1000 + 50,
-      change: (Math.random() - 0.5) * 20,
-      changePercent: (Math.random() - 0.5) * 10,
-      volume: Math.floor(Math.random() * 100000000),
-      marketCap: Math.floor(Math.random() * 1000000000000)
-    };
-
-    setWatchlist([...watchlist, newStock]);
-    setNewSymbol('');
-    toast.success(`${symbol} added to watchlist`);
   };
 
-  const handleRemoveStock = (symbol) => {
-    setWatchlist(watchlist.filter(stock => stock.symbol !== symbol));
-    toast.success(`${symbol} removed from watchlist`);
+  const handleRemoveStock = async (symbol) => {
+    try {
+      await watchlistAPI.removeStock(symbol);
+      toast.success(`${symbol} removed from watchlist`);
+      setWatchlist(watchlist.filter(stock => stock.symbol !== symbol));
+    } catch (err) {
+      const message = err.response?.data?.detail || 'Failed to remove stock from watchlist';
+      toast.error(message);
+    }
   };
+
+  const filteredWatchlist = watchlist.filter(stock =>
+    stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    stock.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-4">{error}</div>
+          <button
+            onClick={fetchWatchlist}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -102,86 +97,115 @@ const Watchlist = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Watchlist</h1>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+            <EyeIcon className="w-8 h-8 mr-3" />
+            Watchlist
+          </h1>
           <p className="mt-2 text-gray-600">Track your favorite stocks</p>
         </div>
+        
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+          <PlusIcon className="w-5 h-5 mr-2" />
+          Add Stock
+        </button>
       </div>
 
-      {/* Add Stock Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Stock to Watchlist</h2>
-        <form onSubmit={handleAddStock} className="flex gap-4">
-          <input
-            type="text"
-            placeholder="Enter stock symbol (e.g., AAPL)"
-            value={newSymbol}
-            onChange={(e) => setNewSymbol(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          <button
-            type="submit"
-            className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors flex items-center"
-          >
-            <PlusIcon className="w-5 h-5 mr-2" />
-            Add
-          </button>
-        </form>
+      {/* Search Bar */}
+      <div className="relative">
+        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search watchlist..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
+        />
       </div>
 
-      {/* Watchlist */}
+      {/* Watchlist Content */}
       {watchlist.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <PlusIcon className="w-8 h-8 text-gray-400" />
+        <div className="text-center py-12">
+          <EyeIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No stocks in watchlist</h3>
+          <p className="mt-1 text-sm text-gray-500">Get started by adding some stocks to track.</p>
+          <div className="mt-6">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Add Stock
+            </button>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Your watchlist is empty</h3>
-          <p className="text-gray-600 mb-4">Add stocks to your watchlist to track their performance</p>
         </div>
       ) : (
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Watchlist ({watchlist.length} stocks)
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {watchlist.map((stock) => (
-              <div key={stock.symbol} className="relative">
-                <StockCard stock={stock} />
-                <button
-                  onClick={() => handleRemoveStock(stock.symbol)}
-                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                  title="Remove from watchlist"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+          {filteredWatchlist.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No stocks match your search criteria.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredWatchlist.map((stock) => (
+                <div key={stock.symbol} className="relative">
+                  <StockCard stock={stock} />
+                  <button
+                    onClick={() => handleRemoveStock(stock.symbol)}
+                    className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                    title="Remove from watchlist"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Watchlist Summary */}
-      {watchlist.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Watchlist Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{watchlist.length}</p>
-              <p className="text-gray-600">Total Stocks</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-success-600">
-                {watchlist.filter(stock => stock.change >= 0).length}
-              </p>
-              <p className="text-gray-600">Gainers</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-danger-600">
-                {watchlist.filter(stock => stock.change < 0).length}
-              </p>
-              <p className="text-gray-600">Losers</p>
+      {/* Add Stock Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Stock to Watchlist</h3>
+              <form onSubmit={handleAddStock}>
+                <div className="mb-4">
+                  <label htmlFor="stockSymbol" className="block text-sm font-medium text-gray-700 mb-2">
+                    Stock Symbol
+                  </label>
+                  <input
+                    type="text"
+                    id="stockSymbol"
+                    value={newStockSymbol}
+                    onChange={(e) => setNewStockSymbol(e.target.value)}
+                    placeholder="e.g., AAPL"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingStock}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {addingStock ? 'Adding...' : 'Add Stock'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

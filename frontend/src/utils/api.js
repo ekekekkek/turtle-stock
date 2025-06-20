@@ -92,6 +92,9 @@ export const watchlistAPI = {
   
   // Remove stock from watchlist
   removeStock: (symbol) => api.delete(`/api/watchlist/stocks/${symbol}`),
+  
+  // Get watchlist quotes
+  getQuotes: () => api.get('/api/watchlist/quotes'),
 };
 
 // User-related API functions
@@ -103,13 +106,13 @@ export const userAPI = {
   register: (userData) => api.post('/api/auth/register', userData),
   
   // Get user profile
-  getProfile: () => api.get('/api/user/profile'),
-  
-  // Update user profile
-  updateProfile: (data) => api.put('/api/user/profile', data),
+  getProfile: () => api.get('/api/auth/me'),
   
   // Logout
-  logout: () => api.post('/api/auth/logout'),
+  logout: () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  },
 };
 
 export default api; 

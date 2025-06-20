@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Bars3Icon, 
   XMarkIcon,
   ChartBarIcon,
   EyeIcon,
-  BriefcaseIcon
+  BriefcaseIcon,
+  UserIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: ChartBarIcon },
@@ -19,6 +24,11 @@ const Navbar = () => {
   ];
 
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+    setIsUserMenuOpen(false);
+  };
 
   return (
     <nav className="bg-white shadow-lg">
@@ -49,6 +59,33 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
+            
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 focus:outline-none"
+              >
+                <UserIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">{user?.username || user?.email}</span>
+              </button>
+              
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                  <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                    <div className="font-medium">{user?.full_name || user?.username}</div>
+                    <div className="text-gray-500">{user?.email}</div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -86,6 +123,21 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
+            
+            {/* Mobile user info and logout */}
+            <div className="px-3 py-2 border-t border-gray-200">
+              <div className="text-sm text-gray-700 mb-2">
+                <div className="font-medium">{user?.full_name || user?.username}</div>
+                <div className="text-gray-500">{user?.email}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
+              >
+                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-3" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       )}

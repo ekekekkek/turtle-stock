@@ -11,6 +11,10 @@ A modern, responsive React-based frontend for the Turtle Stock Platform, designe
 - 🔍 **Stock Search**: Search and discover new stocks
 - 📱 **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 - 🎨 **Modern UI**: Clean, intuitive interface built with Tailwind CSS
+- 🔐 **User Authentication**: Secure login/register with JWT tokens
+- 📅 **Portfolio Management**: Track multiple purchases per stock with dates and prices
+- 📋 **Watchlist**: Add/remove stocks to personal watchlist
+- 📊 **Market Overview**: Key market indices and metrics
 
 ## Tech Stack
 
@@ -28,25 +32,33 @@ A modern, responsive React-based frontend for the Turtle Stock Platform, designe
 
 - Node.js (v16 or higher)
 - npm or yarn
+- Backend server running (see backend README)
 
 ### Installation
 
-1. Navigate to the frontend directory:
+1. **Clone the repository** (if not already done):
    ```bash
-   cd frontend
+   git clone <repository-url>
+   cd turtle-stock/frontend
    ```
 
-2. Install dependencies:
+2. **Install dependencies**:
    ```bash
    npm install
    ```
 
-3. Start the development server:
+3. **Configure environment variables**:
+   Create a `.env` file in the frontend directory:
+   ```env
+   REACT_APP_API_URL=http://localhost:8000
+   ```
+
+4. **Start the development server**:
    ```bash
    npm start
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+The application will open at `http://localhost:3000`.
 
 ### Available Scripts
 
@@ -88,23 +100,32 @@ frontend/
 
 The frontend is designed to work with a FastAPI backend. The API configuration is set up in `src/utils/api.js` with the following endpoints:
 
-### Stock Endpoints
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get user profile
+
+### Stocks
 - `GET /api/stocks/{symbol}/quote` - Get stock quote
 - `GET /api/stocks/{symbol}/history` - Get historical data
 - `GET /api/stocks/{symbol}/info` - Get stock information
 - `GET /api/stocks/search` - Search stocks
 - `GET /api/stocks/trending` - Get trending stocks
 
-### Portfolio Endpoints
+### Portfolio
 - `GET /api/portfolio` - Get user portfolio
 - `POST /api/portfolio/stocks` - Add stock to portfolio
 - `PUT /api/portfolio/stocks/{symbol}` - Update stock in portfolio
 - `DELETE /api/portfolio/stocks/{symbol}` - Remove stock from portfolio
 
-### Watchlist Endpoints
+### Watchlist
 - `GET /api/watchlist` - Get user watchlist
 - `POST /api/watchlist/stocks` - Add stock to watchlist
 - `DELETE /api/watchlist/stocks/{symbol}` - Remove stock from watchlist
+- `GET /api/watchlist/quotes` - Get watchlist quotes
+
+### Market Data
+- `GET /api/market/overview` - Get market overview
 
 ## Environment Variables
 
