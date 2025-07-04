@@ -9,6 +9,8 @@ const api = axios.create({
   },
 });
 
+console.log('API Base URL:', process.env.REACT_APP_API_URL || 'http://localhost:8000');
+
 // Request interceptor for adding auth tokens
 api.interceptors.request.use(
   (config) => {
@@ -16,9 +18,11 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('API Request:', config.method?.toUpperCase(), config.url, config.headers);
     return config;
   },
   (error) => {
+    console.error('API Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -26,9 +30,11 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
+    console.log('API Response:', response.status, response.config.url);
     return response;
   },
   (error) => {
+    console.error('API Response Error:', error.response?.status, error.response?.data, error.config?.url);
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('authToken');
@@ -68,7 +74,7 @@ export const portfolioAPI = {
   getPortfolio: () => api.get('/api/portfolio'),
   
   // Add stock to portfolio
-  addStock: (data) => api.post('/api/portfolio/stocks', data),
+  addStock: ({ symbol, shares, price, date }) => api.post('/api/portfolio/stocks', { symbol, shares, price, date }),
   
   // Update stock in portfolio
   updateStock: (symbol, data) => api.put(`/api/portfolio/stocks/${symbol}`, data),
@@ -94,7 +100,7 @@ export const watchlistAPI = {
   removeStock: (symbol) => api.delete(`/api/watchlist/stocks/${symbol}`),
   
   // Get watchlist quotes
-  getQuotes: () => api.get('/api/watchlist/quotes'),
+  getQuotes:   () => api.get('/api/watchlist/quotes'),
 };
 
 // User-related API functions

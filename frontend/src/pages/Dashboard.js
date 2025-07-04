@@ -5,6 +5,14 @@ import StockCard from '../components/StockCard';
 import MarketOverview from '../components/MarketOverview';
 import { ArrowTrendingUpIcon, ChartBarIcon, EyeIcon } from '@heroicons/react/24/outline';
 
+// Helper to extract a string message from error objects
+const extractErrorMessage = (err, fallback) => {
+  const detail = err.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail?.msg) return detail.msg;
+  return fallback;
+};
+
 const Dashboard = () => {
   const [trendingStocks, setTrendingStocks] = useState([]);
   const [marketOverview, setMarketOverview] = useState(null);
@@ -30,7 +38,8 @@ const Dashboard = () => {
       setMarketOverview(marketResponse.data);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data. Please try again later.');
+      setError(
+        extractErrorMessage(err, 'Failed to load dashboard data. Please try again later.'));
     } finally {
       setLoading(false);
     }
@@ -62,13 +71,14 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      
+      {/* Header 
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Turtle Stock</h1>
         <p className="text-gray-600">Your comprehensive stock trading platform</p>
-      </div>
-
-      {/* Market Overview */}
+      </div> */}
+      
+      {/* Market Overview 
       {marketOverview && (
         <div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -77,7 +87,7 @@ const Dashboard = () => {
           </h2>
           <MarketOverview data={marketOverview} />
         </div>
-      )}
+      )} */}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -20,7 +20,7 @@ def get_user_watchlist(
     return watchlist
 
 @router.post("/stocks", response_model=WatchlistResponse)
-async def add_stock_to_watchlist(
+def add_stock_to_watchlist(
     watchlist_item: WatchlistCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -39,12 +39,7 @@ async def add_stock_to_watchlist(
         )
     
     # Get stock info to validate symbol and get company name
-    stock_info = await stock_service.get_stock_info(watchlist_item.symbol)
-    if not stock_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Stock {watchlist_item.symbol} not found"
-        )
+    stock_info = stock_service.get_stock_info(watchlist_item.symbol)
     
     # Create watchlist item
     db_watchlist = Watchlist(
@@ -80,7 +75,7 @@ def remove_stock_from_watchlist(
     return {"message": f"Stock {symbol} removed from watchlist"}
 
 @router.get("/quotes")
-async def get_watchlist_quotes(
+def get_watchlist_quotes(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -89,11 +84,26 @@ async def get_watchlist_quotes(
     
     quotes = []
     for item in watchlist:
-        quote = await stock_service.get_stock_quote(item.symbol)
-        if quote:
-            quotes.append({
-                **quote,
-                "company_name": item.company_name
-            })
+        # try live lookup...
+        quote = stock_service.get_stock_quote(item.symbol)
+        # ...but if it failed, return a zero‐filled stub instead
+        if quote is None:
+            from datetime import datetime
+            quote = {
+                "symbol":         item.symbol,
+                "price":          0.0,
+                "change":         0.0,
+                "change_percent": 0.0,
+                "volume":         0,
+                "market_cap":     None,
+                "high":           None,
+                "low":            None,
+                "open":           None,
+                "previous_close": None,
+                "timestamp":      datetime.utcnow()
+            }
+        # always include the stored company_name
+        quote["company_name"] = item.company_name
+        quotes.append(quote)
     
     return quotes 

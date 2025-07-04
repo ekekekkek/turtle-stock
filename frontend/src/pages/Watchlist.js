@@ -5,6 +5,14 @@ import StockCard from '../components/StockCard';
 import { EyeIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+// Helper to extract a string message from error objects
+const extractErrorMessage = (err, fallback) => {
+  const detail = err.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail?.msg) return detail.msg;
+  return fallback;
+};
+
 const Watchlist = () => {
   const [watchlist, setWatchlist] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +35,7 @@ const Watchlist = () => {
       setWatchlist(response.data);
     } catch (err) {
       console.error('Error fetching watchlist:', err);
-      setError('Failed to load watchlist. Please try again later.');
+      setError(extractErrorMessage(err, 'Failed to load watchlist. Please try again later.'));
     } finally {
       setLoading(false);
     }

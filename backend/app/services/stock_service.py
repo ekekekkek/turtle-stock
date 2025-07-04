@@ -1,161 +1,155 @@
-import yfinance as yf
-import pandas as pd
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
 import logging
+import finnhub
+import redis
+import json
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# initialize Finnhub client
+_fh = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
+
+# initialize Redis for caching (future use)
+_cache = redis.from_url(settings.REDIS_URL, decode_responses=True)
+
 class StockService:
-    def __init__(self):
-        self.timeout = settings.YAHOO_FINANCE_TIMEOUT
 
-    async def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get real-time stock quote"""
+    def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Get real-time stock quote via Finnhub"""
         try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            
-            # Get current price and basic info
-            current_price = info.get('currentPrice', 0)
-            previous_close = info.get('previousClose', 0)
-            change = current_price - previous_close if previous_close else 0
-            change_percent = (change / previous_close * 100) if previous_close else 0
-            
-            return {
-                "symbol": symbol.upper(),
-                "price": current_price,
-                "change": change,
-                "change_percent": change_percent,
-                "volume": info.get('volume', 0),
-                "market_cap": info.get('marketCap'),
-                "high": info.get('dayHigh'),
-                "low": info.get('dayLow'),
-                "open": info.get('open'),
-                "previous_close": previous_close,
-                "timestamp": datetime.now()
-            }
+            q = _fh.quote(symbol)
         except Exception as e:
-            logger.error(f"Error fetching stock quote for {symbol}: {str(e)}")
+            logger.error("Error fetching quote for %s: %s", symbol, e)
             return None
 
-    async def get_stock_info(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get detailed stock information"""
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            
-            return {
-                "symbol": symbol.upper(),
-                "name": info.get('longName', info.get('shortName', '')),
-                "sector": info.get('sector'),
-                "industry": info.get('industry'),
-                "description": info.get('longBusinessSummary'),
-                "website": info.get('website'),
-                "employees": info.get('fullTimeEmployees'),
-                "country": info.get('country')
-            }
-        except Exception as e:
-            logger.error(f"Error fetching stock info for {symbol}: {str(e)}")
+        # Finnhub returns {'c': current, 'pc': prev close, 'dp': pct, 'v': volume}
+        if q.get("c") is None:
+            logger.warning("No current price data for %s", symbol)
             return None
 
-    async def get_stock_history(self, symbol: str, period: str = "1d", interval: str = "1m") -> Optional[Dict[str, Any]]:
-        """Get historical stock data"""
+        return {
+            "symbol":         symbol.upper(),
+            "price":          q["c"],
+            "change":         q["c"] - q.get("pc", 0.0),
+            "change_percent": q.get("dp", 0.0),
+            "volume":         q.get("v", 0),
+            "timestamp":      datetime.now(timezone.utc),
+        }
+
+    def get_stock_info(self, symbol: str) -> Dict[str, Any]:
+        """Get basic stock info (company name) via Finnhub"""
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period=period, interval=interval)
-            
-            if hist.empty:
-                return None
-            
-            # Convert to list of dictionaries
-            data = []
-            for index, row in hist.iterrows():
-                data.append({
-                    "timestamp": index.isoformat(),
-                    "open": float(row['Open']),
-                    "high": float(row['High']),
-                    "low": float(row['Low']),
-                    "close": float(row['Close']),
-                    "volume": int(row['Volume'])
-                })
-            
-            return {
-                "symbol": symbol.upper(),
-                "period": period,
-                "interval": interval,
-                "data": data
-            }
+            info = _fh.company_profile2(symbol=symbol)
         except Exception as e:
-            logger.error(f"Error fetching stock history for {symbol}: {str(e)}")
+            logger.error("Error fetching company info for %s: %s", symbol, e)
+            return {"symbol": symbol.upper(), "name": symbol.upper()}
+
+        name = info.get("name") or symbol.upper()
+        return {"symbol": symbol.upper(), "name": name}
+
+    def get_stock_history(
+        self,
+        symbol: str,
+        start_ts: Optional[int] = None,
+        end_ts: Optional[int] = None,
+        resolution: str = "D",
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get historical price candles via Finnhub.
+        By default returns last 30 days of daily candles.
+        """
+        now = int(datetime.now(timezone.utc).timestamp())
+        if end_ts is None:
+            end_ts = now
+        if start_ts is None:
+            start_ts = end_ts - 30 * 24 * 3600  # 30 days ago
+
+        try:
+            resp = _fh.stock_candles(symbol, resolution, start_ts, end_ts)
+        except Exception as e:
+            logger.error("Error fetching history for %s: %s", symbol, e)
             return None
 
-    async def search_stocks(self, query: str) -> List[Dict[str, Any]]:
-        """Search for stocks by symbol or company name"""
+        if resp.get("s") != "ok":
+            return None
+
+        # build list of candle dicts
+        data = []
+        for t, o, h, l, c, v in zip(
+            resp["t"], resp["o"], resp["h"], resp["l"], resp["c"], resp["v"]
+        ):
+            data.append({
+                "timestamp": datetime.fromtimestamp(t, timezone.utc).isoformat(),
+                "open":      o,
+                "high":      h,
+                "low":       l,
+                "close":     c,
+                "volume":    v,
+            })
+
+        return {
+            "symbol":     symbol.upper(),
+            "resolution": resolution,
+            "from":       start_ts,
+            "to":         end_ts,
+            "data":       data,
+        }
+
+    def search_stocks(self, query: str) -> List[Dict[str, Any]]:
+        """Search for symbols/company names via Finnhub lookup"""
         try:
-            # Use yfinance's search functionality
-            search_results = yf.Tickers(query)
-            results = []
-            
-            for ticker in search_results.tickers:
-                try:
-                    info = ticker.info
-                    results.append({
-                        "symbol": info.get('symbol', ''),
-                        "name": info.get('longName', info.get('shortName', '')),
-                        "exchange": info.get('exchange'),
-                        "type": info.get('quoteType')
-                    })
-                except:
-                    continue
-            
-            return results[:10]  # Limit to 10 results
+            resp = _fh.symbol_lookup(query)
         except Exception as e:
-            logger.error(f"Error searching stocks for {query}: {str(e)}")
+            logger.error("Error searching stocks for %s: %s", query, e)
             return []
 
-    async def get_trending_stocks(self) -> List[Dict[str, Any]]:
-        """Get trending stocks (popular stocks)"""
-        try:
-            # Popular stock symbols
-            popular_symbols = [
-                "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "NFLX",
-                "AMD", "INTC", "CRM", "ADBE", "PYPL", "UBER", "LYFT", "SPOT"
-            ]
-            
-            trending = []
-            for symbol in popular_symbols[:8]:  # Limit to 8 stocks
-                quote = await self.get_stock_quote(symbol)
-                if quote:
-                    trending.append(quote)
-            
-            return trending
-        except Exception as e:
-            logger.error(f"Error fetching trending stocks: {str(e)}")
-            return []
+        results = []
+        for item in resp.get("result", []):
+            results.append({
+                "symbol":      item.get("symbol"),
+                "description": item.get("description"),
+                "type":        item.get("type"),
+            })
+        return results[:10]
 
-    async def get_market_overview(self) -> Dict[str, Any]:
-        """Get market overview with major indices"""
-        try:
-            indices = {
-                "sp500": "^GSPC",
-                "nasdaq": "^IXIC", 
-                "dow_jones": "^DJI"
-            }
-            
-            overview = {
-                "timestamp": datetime.now()
-            }
-            
-            for index_name, symbol in indices.items():
-                quote = await self.get_stock_quote(symbol)
-                if quote:
-                    overview[index_name] = quote
-            
-            return overview
-        except Exception as e:
-            logger.error(f"Error fetching market overview: {str(e)}")
-            return {"timestamp": datetime.now()}
+    def get_trending_stocks(self) -> List[Dict[str, Any]]:
+        """
+        Finnhub free tier doesn’t have a trending endpoint,
+        so use a static list or your most-popular symbols.
+        """
+        popular = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "NFLX"]
+        quotes = []
+        for sym in popular:
+            q = self.get_stock_quote(sym)
+            if q:
+                quotes.append(q)
+        return quotes
 
-stock_service = StockService() 
+    def get_market_overview(self) -> Dict[str, Any]:
+        """Get major index quotes via Finnhub"""
+        indices = {"sp500": "^GSPC", "nasdaq": "^IXIC", "dow_jones": "^DJI"}
+        overview = {"timestamp": datetime.now(timezone.utc)}
+        for name, sym in indices.items():
+            quote = self.get_stock_quote(sym)
+            if quote:
+                overview[name] = quote
+            else:
+                # Return empty quote structure if data not available
+                overview[name] = {
+                    "symbol": sym,
+                    "price": 0.0,
+                    "change": 0.0,
+                    "change_percent": 0.0,
+                    "volume": 0,
+                    "market_cap": None,
+                    "high": None,
+                    "low": None,
+                    "open": None,
+                    "previous_close": None,
+                    "timestamp": datetime.now(timezone.utc)
+                }
+        return overview
+
+stock_service = StockService()

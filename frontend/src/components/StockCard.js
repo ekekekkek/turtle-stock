@@ -6,14 +6,24 @@ const StockCard = ({ stock }) => {
   const {
     symbol,
     name,
-    price,
-    change,
-    changePercent,
-    volume,
-    marketCap
+    price = 0,
+    change = 0,
+    changePercent,    // might be undefined
+    volume = 0,
+    marketCap         // might be undefined
   } = stock;
 
+  // fall back to snake_case props or sensible defaults
+  const displayName = name ?? stock.company_name ?? symbol;
+  const cp = typeof changePercent === 'number'
+    ? changePercent
+    : stock.change_percent ?? 0;
+  const mc = typeof marketCap === 'number'
+    ? marketCap
+    : stock.market_cap ?? 0;
+
   const isPositive = change >= 0;
+
   const formattedPrice = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -34,7 +44,7 @@ const StockCard = ({ stock }) => {
   const formattedMarketCap = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     maximumFractionDigits: 1,
-  }).format(marketCap);
+  }).format(mc);
 
   return (
     <Link
@@ -44,19 +54,21 @@ const StockCard = ({ stock }) => {
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{symbol}</h3>
-          <p className="text-sm text-gray-600 truncate max-w-48">{name}</p>
+          <p className="text-sm text-gray-600 truncate max-w-48">{displayName}</p>
         </div>
         <div className="text-right">
           <p className="text-xl font-bold text-gray-900">{formattedPrice}</p>
-          <div className={`flex items-center text-sm font-medium ${
-            isPositive ? 'text-success-600' : 'text-danger-600'
-          }`}>
+          <div
+            className={`flex items-center text-sm font-medium ${
+              isPositive ? 'text-success-600' : 'text-danger-600'
+            }`}
+          >
             {isPositive ? (
               <ArrowUpIcon className="w-4 h-4 mr-1" />
             ) : (
               <ArrowDownIcon className="w-4 h-4 mr-1" />
             )}
-            {formattedChange} ({changePercent.toFixed(2)}%)
+            {formattedChange} ({cp.toFixed(2)}%)
           </div>
         </div>
       </div>
@@ -75,4 +87,4 @@ const StockCard = ({ stock }) => {
   );
 };
 
-export default StockCard; 
+export default StockCard;

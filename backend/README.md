@@ -5,7 +5,7 @@ A FastAPI-based backend for the Turtle Stock Platform, providing real-time stock
 ## Features
 
 - 🔐 **User Authentication**: JWT-based authentication with secure password hashing
-- 📊 **Real-time Stock Data**: Integration with Yahoo Finance API via yfinance
+- 📊 **Real-time Stock Data**: FinnHub Free tier -- for personal use only! 
 - 💼 **Portfolio Management**: Track investments with multiple purchases per stock
 - 👀 **Watchlist**: Manage favorite stocks
 - 📈 **Market Overview**: Major indices and trending stocks

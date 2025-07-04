@@ -15,6 +15,13 @@ const StockDetails = () => {
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isInPortfolio, setIsInPortfolio] = useState(false);
 
+  const extractErrorMessage = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (detail?.msg) return detail.msg;
+    return fallback;
+  };
+
   useEffect(() => {
     if (symbol) {
       fetchStockData();
@@ -67,8 +74,9 @@ const StockDetails = () => {
       setIsInWatchlist(true);
       toast.success(`${symbol} added to watchlist`);
     } catch (err) {
-      const message = err.response?.data?.detail || 'Failed to add to watchlist';
-      toast.error(message);
+      toast.error(
+        extractErrorMessage(err, 'Failed to add to watchlist')
+      );
     }
   };
 
@@ -78,8 +86,9 @@ const StockDetails = () => {
       setIsInWatchlist(false);
       toast.success(`${symbol} removed from watchlist`);
     } catch (err) {
-      const message = err.response?.data?.detail || 'Failed to remove from watchlist';
-      toast.error(message);
+      toast.error(
+        extractErrorMessage(err, 'Failed to remove from watchlist')
+      );
     }
   };
 

@@ -1,13 +1,17 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import date, datetime
 
 class PortfolioBase(BaseModel):
     symbol: str
     company_name: Optional[str] = None
 
-class PortfolioCreate(PortfolioBase):
-    pass
+
+class PortfolioCreate(BaseModel):
+    symbol: str
+    shares: float
+    price: float
+    date: date
 
 class PortfolioUpdate(BaseModel):
     company_name: Optional[str] = None

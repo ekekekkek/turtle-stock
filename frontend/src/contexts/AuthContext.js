@@ -23,9 +23,11 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     const token = localStorage.getItem('authToken');
+    console.log('Checking auth status, token:', token ? 'exists' : 'none');
     if (token) {
       try {
         const response = await userAPI.getProfile();
+        console.log('Auth check successful:', response.data);
         setUser(response.data);
         setIsAuthenticated(true);
       } catch (error) {
