@@ -121,4 +121,12 @@ export const userAPI = {
   },
 };
 
+// Signals-related API functions
+export const signalsAPI = {
+  getSignals: () => api.get('/api/signals/'),
+  getTodaySignals: () => api.get('/api/signals/today'),
+  generateSignals: () => api.post('/api/signals/generate'),
+  getSignalsStatus: () => api.get('/api/signals/status'),
+};
+
 export default api; 

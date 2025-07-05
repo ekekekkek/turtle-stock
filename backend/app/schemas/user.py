@@ -6,6 +6,8 @@ class UserBase(BaseModel):
     email: EmailStr
     username: str
     full_name: Optional[str] = None
+    risk_tolerance: Optional[int] = 1
+    capital: Optional[int] = 10000
 
 class UserCreate(UserBase):
     password: str
@@ -15,6 +17,8 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     full_name: Optional[str] = None
     password: Optional[str] = None
+    risk_tolerance: Optional[int] = None
+    capital: Optional[int] = None
 
 class UserLogin(BaseModel):
     email: EmailStr

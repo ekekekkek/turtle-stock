@@ -16,6 +16,13 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    # New fields for user settings
+    risk_tolerance = Column(Integer, default=1)  # percent, e.g. 1 for 1%
+    capital = Column(Integer, default=10000)     # total capital in dollars
+    
     # Relationships
     portfolios = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")
-    watchlist = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan") 
+    watchlist = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
+    
+    # New field for admin-only endpoints
+    is_admin = Column(Boolean, default=False) 

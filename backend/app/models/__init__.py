@@ -5,5 +5,6 @@ Base = declarative_base()
 from .user import User
 from .portfolio import Portfolio, PortfolioTransaction
 from .watchlist import Watchlist
+from .signal import Signal
 
 __all__ = ["Base", "User", "Portfolio", "PortfolioTransaction", "Watchlist"] 
