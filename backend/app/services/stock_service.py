@@ -97,6 +97,90 @@ class StockService:
             "data":       data,
         }
 
+    def calculate_atr(self, symbol: str, window: int = 14) -> Optional[float]:
+        """
+        Calculate Average True Range (ATR) for volatility measurement
+        """
+        try:
+            # Get more data for ATR calculation (need at least window + 1 days)
+            end_ts = int(datetime.now(timezone.utc).timestamp())
+            start_ts = end_ts - (window + 10) * 24 * 3600  # Extra days for safety
+            
+            history = self.get_stock_history(symbol, start_ts, end_ts, "D")
+            if not history or len(history["data"]) < window + 1:
+                return None
+
+            data = history["data"]
+            true_ranges = []
+
+            for i in range(1, len(data)):
+                high = data[i]["high"]
+                low = data[i]["low"]
+                prev_close = data[i-1]["close"]
+                
+                # True Range = max(high - low, |high - prev_close|, |low - prev_close|)
+                tr1 = high - low
+                tr2 = abs(high - prev_close)
+                tr3 = abs(low - prev_close)
+                true_range = max(tr1, tr2, tr3)
+                true_ranges.append(true_range)
+
+            if len(true_ranges) < window:
+                return None
+
+            # Calculate ATR as simple moving average of true ranges
+            atr = sum(true_ranges[-window:]) / window
+            return atr
+
+        except Exception as e:
+            logger.error("Error calculating ATR for %s: %s", symbol, e)
+            return None
+
+    def calculate_position_size(self, symbol: str, capital: float, risk_percent: float, window: int = 14) -> Dict[str, Any]:
+        """
+        Calculate recommended position size based on volatility and risk management
+        """
+        try:
+            # Get current price
+            quote = self.get_stock_quote(symbol)
+            if not quote:
+                return {"error": "Unable to get current price"}
+
+            current_price = quote["price"]
+            
+            # Calculate ATR
+            atr = self.calculate_atr(symbol, window)
+            if not atr:
+                return {"error": "Unable to calculate volatility"}
+
+            # Calculate stop loss distance (2 * ATR below entry)
+            stop_loss_distance = 2 * atr
+            stop_loss_price = current_price - stop_loss_distance
+
+            # Calculate position size based on risk
+            risk_amount = capital * (risk_percent / 100)
+            position_size = risk_amount / stop_loss_distance
+
+            # Ensure position doesn't exceed capital
+            max_position_value = capital
+            if position_size * current_price > max_position_value:
+                position_size = max_position_value / current_price
+
+            return {
+                "symbol": symbol,
+                "current_price": current_price,
+                "atr": atr,
+                "stop_loss_price": stop_loss_price,
+                "recommended_shares": round(position_size, 2),
+                "position_value": round(position_size * current_price, 2),
+                "risk_amount": risk_amount,
+                "stop_loss_distance": stop_loss_distance
+            }
+
+        except Exception as e:
+            logger.error("Error calculating position size for %s: %s", symbol, e)
+            return {"error": "Unable to calculate position size"}
+
     def search_stocks(self, query: str) -> List[Dict[str, Any]]:
         """Search for symbols/company names via Finnhub lookup"""
         try:
@@ -116,7 +200,7 @@ class StockService:
 
     def get_trending_stocks(self) -> List[Dict[str, Any]]:
         """
-        Finnhub free tier doesn’t have a trending endpoint,
+        Finnhub free tier doesn't have a trending endpoint,
         so use a static list or your most-popular symbols.
         """
         popular = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "NFLX"]

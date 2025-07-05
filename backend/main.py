@@ -48,7 +48,7 @@ app = FastAPI(
 # --- CORS must come before including any routers ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,   # pulled from your .env via pydantic
+    allow_origins=["*"],   # <-- allow all for debugging
     allow_credentials=True,                   # allow Authorization header / cookies
     allow_methods=["*"],
     allow_headers=["*"],

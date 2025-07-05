@@ -86,6 +86,13 @@ export const portfolioAPI = {
   getPerformance: (period = '1y') => api.get('/api/portfolio/performance', {
     params: { period }
   }),
+
+  // New endpoints
+  getSettings: () => api.get('/api/portfolio/settings'),
+  updateSettings: (settings) => api.put('/api/portfolio/settings', settings),
+  getPositionSize: (data) => api.post('/api/portfolio/position-size', data),
+  sellStock: (symbol, data) => api.post(`/api/portfolio/stocks/${symbol}/sell`, data),
+  getTradeHistory: () => api.get('/api/portfolio/trade-history'),
 };
 
 // Watchlist-related API functions

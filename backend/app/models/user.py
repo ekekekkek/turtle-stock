@@ -23,6 +23,7 @@ class User(Base):
     # Relationships
     portfolios = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")
     watchlist = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
+    trade_history = relationship("TradeHistory", back_populates="user", cascade="all, delete-orphan")
     
     # New field for admin-only endpoints
     is_admin = Column(Boolean, default=False) 
