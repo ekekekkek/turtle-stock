@@ -138,6 +138,7 @@ const Dashboard = () => {
       </div>
 
       {/* Trending Stocks */}
+      {/*
       <div>
         <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
           <ArrowTrendingUpIcon className="w-6 h-6 mr-2" />
@@ -155,6 +156,7 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      */}
     </div>
   );
 };

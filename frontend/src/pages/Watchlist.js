@@ -26,13 +26,10 @@ const Watchlist = () => {
   const [newStockSymbol, setNewStockSymbol] = useState('');
   const [addingStock, setAddingStock] = useState(false);
   const [lastRun, setLastRun] = useState(null);
+  const [signalsRequested, setSignalsRequested] = useState(false);
 
   useEffect(() => {
     fetchWatchlist();
-    if (isAuthenticated) {
-      fetchSignals();
-      fetchStatus();
-    }
   }, [isAuthenticated]);
 
   const fetchWatchlist = async () => {
@@ -50,31 +47,6 @@ const Watchlist = () => {
     }
   };
 
-  const fetchSignals = async () => {
-    if (!isAuthenticated) {
-      toast.error('Please log in to view signals');
-      return;
-    }
-    
-    try {
-      setSignalsLoading(true);
-      const res = await signalsAPI.getTodaySignals();
-      setSignals(res.data);
-      if (res.data.length > 0) {
-        toast.success(`${res.data.length} daily signals available!`);
-      }
-    } catch (err) {
-      console.error('Error fetching signals:', err);
-      if (err.response?.status === 401) {
-        toast.error('Please log in to view signals');
-      } else {
-        toast.error('Failed to load signals');
-      }
-    } finally {
-      setSignalsLoading(false);
-    }
-  };
-
   const fetchStatus = async () => {
     try {
       const res = await signalsAPI.getSignalsStatus();
@@ -89,6 +61,7 @@ const Watchlist = () => {
       toast.error('Please log in to view signals');
       return;
     }
+    setSignalsRequested(true);
     try {
       setSignalsLoading(true);
       const res = await signalsAPI.getTodaySignals();
@@ -96,7 +69,10 @@ const Watchlist = () => {
       if (res.data.length > 0) {
         toast.success(`${res.data.length} daily signals available!`);
       }
+      fetchStatus();
     } catch (err) {
+      setSignals([]);
+      setError('Unable to get analysis.');
       console.error('Error fetching signals:', err);
       if (err.response?.status === 401) {
         toast.error('Please log in to view signals');
@@ -179,7 +155,7 @@ const Watchlist = () => {
           <p className="mt-2 text-gray-600">Track your favorite stocks and daily market signals</p>
           {lastRun && (
             <div className="mt-2 text-xs text-gray-500">
-              Last market analysis: {new Date(lastRun).toLocaleString()}
+              Last market analysis: {new Date(lastRun).toLocaleString()} (based on previous market close)
             </div>
           )}
         </div>
@@ -211,7 +187,7 @@ const Watchlist = () => {
               <h2 className="text-xl font-semibold text-yellow-800">Daily Market Analysis</h2>
             </div>
             <button
-              onClick={fetchSignals}
+              onClick={handleGetSignals}
               disabled={signalsLoading}
               className="text-sm text-yellow-700 hover:text-yellow-800 underline"
             >
@@ -269,6 +245,18 @@ const Watchlist = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : signalsRequested ? (
+            <div className="text-center py-8">
+              <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <p className="text-yellow-700 mb-4">No good stocks today.</p>
+              <p className="text-sm text-yellow-600">Analysis ran, but no stocks met the criteria.</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+              <p className="text-yellow-700 mb-4">Unable to get analysis.</p>
+              <p className="text-sm text-yellow-600">Please try again later.</p>
             </div>
           ) : (
             <div className="text-center py-8">

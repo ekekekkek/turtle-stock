@@ -2,6 +2,8 @@ import logging
 import finnhub
 import redis
 import json
+import time
+import yfinance as yf
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from app.core.config import settings
@@ -14,15 +16,99 @@ _fh = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
 # initialize Redis for caching (future use)
 _cache = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
+# Rate limiting
+_last_api_call = 0
+_min_call_interval = 1.1  # 1.1 seconds between calls to stay under 60/min limit
+
 class StockService:
 
-    def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Get real-time stock quote via Finnhub"""
+    def _rate_limit(self):
+        """Simple rate limiting to stay under Finnhub free tier limits"""
+        global _last_api_call
+        current_time = time.time()
+        time_since_last = current_time - _last_api_call
+        if time_since_last < _min_call_interval:
+            sleep_time = _min_call_interval - time_since_last
+            time.sleep(sleep_time)
+        _last_api_call = time.time()
+
+    def _handle_finnhub_error(self, e, symbol: str, operation: str):
+        """Handle Finnhub API errors gracefully"""
+        error_msg = str(e)
+        if "403" in error_msg or "Forbidden" in error_msg:
+            logger.error(f"Finnhub API 403 error for {symbol} ({operation}): Rate limit exceeded or invalid API key")
+            return None
+        elif "429" in error_msg or "Too Many Requests" in error_msg:
+            logger.error(f"Finnhub API rate limit exceeded for {symbol} ({operation})")
+            return None
+        elif "404" in error_msg or "Not Found" in error_msg:
+            logger.warning(f"Stock {symbol} not found on Finnhub ({operation})")
+            return None
+        else:
+            logger.error(f"Finnhub API error for {symbol} ({operation}): {error_msg}")
+            return None
+
+    def _get_history_from_yahoo(self, symbol: str, start_ts: int, end_ts: int, resolution: str = "D") -> Optional[Dict[str, Any]]:
+        """Get historical data from Yahoo Finance with rate limiting"""
         try:
+            # Add small delay to prevent overwhelming Yahoo Finance
+            time.sleep(0.1)
+            
+            # Convert timestamps to datetime
+            start_dt = datetime.fromtimestamp(start_ts, timezone.utc)
+            end_dt = datetime.fromtimestamp(end_ts, timezone.utc)
+            
+            # Get data from Yahoo Finance with better error handling
+            ticker = yf.Ticker(symbol)
+            
+            # Try to get info first to validate the symbol
+            try:
+                info = ticker.info
+                if not info or 'regularMarketPrice' not in info:
+                    logger.warning(f"Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                    return None
+            except Exception as e:
+                logger.warning(f"Could not validate symbol {symbol} on Yahoo Finance: {e}")
+                return None
+            
+            # Get historical data
+            hist = ticker.history(start=start_dt, end=end_dt, interval='1d')
+            
+            if hist.empty:
+                logger.warning(f"No data returned from Yahoo Finance for {symbol}")
+                return None
+            
+            # Convert to Finnhub format
+            data = []
+            for timestamp, row in hist.iterrows():
+                data.append({
+                    "timestamp": timestamp.isoformat(),
+                    "open": float(row['Open']),
+                    "high": float(row['High']),
+                    "low": float(row['Low']),
+                    "close": float(row['Close']),
+                    "volume": int(row['Volume']),
+                })
+            
+            logger.info(f"Successfully fetched {len(data)} data points from Yahoo Finance for {symbol}")
+            return {
+                "symbol": symbol.upper(),
+                "resolution": resolution,
+                "from": start_ts,
+                "to": end_ts,
+                "data": data,
+            }
+        except Exception as e:
+            logger.error(f"Yahoo Finance fallback failed for {symbol}: {e}")
+            return None
+
+    def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Get real-time stock quote via Finnhub (preferred for real-time data)"""
+        try:
+            self._rate_limit()
             q = _fh.quote(symbol)
         except Exception as e:
-            logger.error("Error fetching quote for %s: %s", symbol, e)
-            return None
+            return self._handle_finnhub_error(e, symbol, "quote")
 
         # Finnhub returns {'c': current, 'pc': prev close, 'dp': pct, 'v': volume}
         if q.get("c") is None:
@@ -41,10 +127,12 @@ class StockService:
     def get_stock_info(self, symbol: str) -> Dict[str, Any]:
         """Get basic stock info (company name) via Finnhub"""
         try:
+            self._rate_limit()
             info = _fh.company_profile2(symbol=symbol)
         except Exception as e:
-            logger.error("Error fetching company info for %s: %s", symbol, e)
-            return {"symbol": symbol.upper(), "name": symbol.upper()}
+            error_result = self._handle_finnhub_error(e, symbol, "company_profile")
+            if error_result is None:
+                return {"symbol": symbol.upper(), "name": symbol.upper()}
 
         name = info.get("name") or symbol.upper()
         return {"symbol": symbol.upper(), "name": name}
@@ -57,8 +145,8 @@ class StockService:
         resolution: str = "D",
     ) -> Optional[Dict[str, Any]]:
         """
-        Get historical price candles via Finnhub.
-        By default returns last 30 days of daily candles.
+        Get historical price candles using Yahoo Finance (primary) with Finnhub fallback.
+        Yahoo Finance is preferred for historical data due to no rate limits.
         """
         now = int(datetime.now(timezone.utc).timestamp())
         if end_ts is None:
@@ -66,13 +154,24 @@ class StockService:
         if start_ts is None:
             start_ts = end_ts - 30 * 24 * 3600  # 30 days ago
 
+        # Try Yahoo Finance first (no rate limits, better for historical data)
+        logger.info(f"Fetching historical data for {symbol} from Yahoo Finance")
+        yahoo_result = self._get_history_from_yahoo(symbol, start_ts, end_ts, resolution)
+        
+        if yahoo_result and yahoo_result.get("data"):
+            return yahoo_result
+        
+        # Fallback to Finnhub if Yahoo Finance fails
+        logger.info(f"Yahoo Finance failed for {symbol}, trying Finnhub fallback")
         try:
+            self._rate_limit()
             resp = _fh.stock_candles(symbol, resolution, start_ts, end_ts)
         except Exception as e:
-            logger.error("Error fetching history for %s: %s", symbol, e)
-            return None
+            error_result = self._handle_finnhub_error(e, symbol, "stock_candles")
+            return error_result
 
         if resp.get("s") != "ok":
+            logger.warning(f"Finnhub returned non-OK status for {symbol}")
             return None
 
         # build list of candle dicts

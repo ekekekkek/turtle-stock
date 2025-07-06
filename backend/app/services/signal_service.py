@@ -1,4 +1,6 @@
 import finnhub
+import time
+import yfinance as yf
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from app.models import Signal, Watchlist, User
@@ -8,6 +10,10 @@ import requests
 from app.models.market_analysis_status import MarketAnalysisStatus
 
 _fh = finnhub.Client(api_key=settings.FINNHUB_API_KEY)
+
+# Rate limiting for signal service
+_last_signal_api_call = 0
+_min_signal_call_interval = 1.1  # 1.1 seconds between calls
 
 class SignalService:
     def __init__(self):
@@ -19,6 +25,83 @@ class SignalService:
         # Initialize stock lists
         self.initialize_stock_lists()
     
+    def _rate_limit(self):
+        """Simple rate limiting to stay under Finnhub free tier limits"""
+        global _last_signal_api_call
+        current_time = time.time()
+        time_since_last = current_time - _last_signal_api_call
+        if time_since_last < _min_signal_call_interval:
+            sleep_time = _min_signal_call_interval - time_since_last
+            time.sleep(sleep_time)
+        _last_signal_api_call = time.time()
+
+    def _handle_finnhub_error(self, e, symbol: str, operation: str):
+        """Handle Finnhub API errors gracefully"""
+        error_msg = str(e)
+        if "403" in error_msg or "Forbidden" in error_msg:
+            print(f"Finnhub API 403 error for {symbol} ({operation}): Rate limit exceeded or invalid API key")
+            return None
+        elif "429" in error_msg or "Too Many Requests" in error_msg:
+            print(f"Finnhub API rate limit exceeded for {symbol} ({operation})")
+            return None
+        elif "404" in error_msg or "Not Found" in error_msg:
+            print(f"Stock {symbol} not found on Finnhub ({operation})")
+            return None
+        else:
+            print(f"Finnhub API error for {symbol} ({operation}): {error_msg}")
+            return None
+
+    def _get_ohlcv_from_yahoo(self, symbol: str, days: int = 252):
+        """Fetch daily OHLCV data from Yahoo Finance (no rate limits)"""
+        try:
+            # Add small delay to prevent overwhelming Yahoo Finance
+            time.sleep(0.1)
+            
+            # Calculate date range
+            end_date = datetime.now(timezone.utc)
+            start_date = end_date - timedelta(days=days)
+            
+            # Get data from Yahoo Finance with better error handling
+            ticker = yf.Ticker(symbol)
+            
+            # Try to get info first to validate the symbol
+            try:
+                info = ticker.info
+                if not info or 'regularMarketPrice' not in info:
+                    print(f"Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                    return None
+            except Exception as e:
+                print(f"Could not validate symbol {symbol} on Yahoo Finance: {e}")
+                return None
+            
+            # Get historical data
+            hist = ticker.history(start=start_date, end=end_date, interval='1d')
+            
+            if hist.empty:
+                print(f"No data returned from Yahoo Finance for {symbol}")
+                return None
+            
+            # Convert to Finnhub format
+            timestamps = [int(dt.timestamp()) for dt in hist.index]
+            opens = hist['Open'].tolist()
+            highs = hist['High'].tolist()
+            lows = hist['Low'].tolist()
+            closes = hist['Close'].tolist()
+            volumes = hist['Volume'].tolist()
+            
+            return {
+                's': 'ok',
+                't': timestamps,
+                'o': opens,
+                'h': highs,
+                'l': lows,
+                'c': closes,
+                'v': volumes
+            }
+        except Exception as e:
+            print(f"Error fetching data from Yahoo Finance for {symbol}: {e}")
+            return None
+
     def initialize_stock_lists(self):
         """Initialize S&P 500 and Nasdaq-100 stock lists"""
         try:
@@ -41,17 +124,9 @@ class SignalService:
             self.all_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
     
     def fetch_ohlcv(self, symbol: str, days: int = 252):
-        """Fetch daily OHLCV data for the past N days from Finnhub"""
-        try:
-            now = int(datetime.now(timezone.utc).timestamp())
-            start = now - days * 24 * 3600
-            resp = _fh.stock_candles(symbol, 'D', start, now)
-            if resp.get('s') != 'ok':
-                return None
-            return resp
-        except Exception as e:
-            print(f"Error fetching data for {symbol}: {e}")
-            return None
+        """Fetch daily OHLCV data using Yahoo Finance (no rate limits)"""
+        print(f"Fetching {days} days of data for {symbol} from Yahoo Finance")
+        return self._get_ohlcv_from_yahoo(symbol, days)
 
     def calculate_indicators(self, ohlcv):
         closes = np.array(ohlcv['c'])
@@ -80,9 +155,11 @@ class SignalService:
 
     def calculate_position_size(self, close, stop_loss, risk_tolerance, capital):
         """Calculate position size based on risk management"""
+        if close is None or stop_loss is None or risk_tolerance is None or capital is None:
+            return 0
         if not stop_loss or stop_loss <= 0:
             return 0
-        risk = (risk_tolerance or 1) / 100
+        risk = risk_tolerance / 100
         risk_per_share = close - stop_loss
         if risk_per_share <= 0:
             return 0
@@ -90,13 +167,33 @@ class SignalService:
 
     def update_last_run(self, db: Session):
         status = db.query(MarketAnalysisStatus).first()
+        # Set last_run to previous market close (4:00 PM ET of previous trading day)
         now = datetime.now(timezone.utc)
+        # Calculate previous market close (4:00 PM ET)
+        eastern = timezone(timedelta(hours=-5))  # EST/EDT offset; for production use pytz or zoneinfo
+        today_et = now.astimezone(eastern).date()
+        market_close_et = datetime.combine(today_et, datetime.min.time(), tzinfo=eastern).replace(hour=16)
+        if now.astimezone(eastern) < market_close_et:
+            # If before today's close, use yesterday
+            prev_day = today_et - timedelta(days=1)
+            market_close_et = datetime.combine(prev_day, datetime.min.time(), tzinfo=eastern).replace(hour=16)
+        # Convert back to UTC
+        market_close_utc = market_close_et.astimezone(timezone.utc)
         if not status:
-            status = MarketAnalysisStatus(last_run=now)
+            status = MarketAnalysisStatus(last_run=market_close_utc)
             db.add(status)
         else:
-            status.last_run = now
+            status.last_run = market_close_utc
         db.commit()
+
+    @staticmethod
+    def has_sufficient_data(data, required_days=252, min_coverage=None):
+        """Flexible check for sufficient data (default: 170 out of 252 days)"""
+        actual_days = len(data)
+        # Accept at least 170 days out of 252
+        min_days = 170 if min_coverage is None else int(required_days * min_coverage)
+        print(f"Actual days: {actual_days}, Required: {required_days}, Minimum accepted: {min_days}")
+        return actual_days >= min_days
 
     def generate_daily_market_analysis(self, db: Session):
         """Generate daily analysis for all S&P 500 and Nasdaq stocks"""
@@ -116,7 +213,7 @@ class SignalService:
             try:
                 print(f"Analyzing {symbol}...")
                 ohlcv = self.fetch_ohlcv(symbol)
-                if not ohlcv or len(ohlcv['c']) < 252:
+                if not ohlcv or not self.has_sufficient_data(ohlcv['c']):
                     print(f"Skipping {symbol}: insufficient data")
                     continue
                 

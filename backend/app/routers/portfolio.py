@@ -11,6 +11,7 @@ from app.schemas.portfolio import (
     SellStockRequest, TradeHistoryResponse, PortfolioPerformanceResponse
 )
 from app.services.stock_service import stock_service
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -36,75 +37,82 @@ def add_stock_to_portfolio(
     db:             Session = Depends(get_db),
 ) -> PortfolioResponse:
     """Buy shares of a stock (adds transaction, creates or updates holding)"""
-    # 1) Validate symbol & fetch company name (synchronous call)
-    info = stock_service.get_stock_info(item.symbol)
-    if not info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Stock {item.symbol} not found"
+    # Defensive check for None values
+    if (
+        current_user.risk_tolerance is not None and current_user.capital is not None
+        and current_user.risk_tolerance > 0 and current_user.capital > 0
+    ):
+        # 1) Validate symbol & fetch company name (synchronous call)
+        info = stock_service.get_stock_info(item.symbol)
+        if not info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Stock {item.symbol} not found"
+            )
+
+        # 2) See if we already hold this symbol
+        holding = (
+            db.query(Portfolio)
+              .filter(
+                Portfolio.user_id == current_user.id,
+                Portfolio.symbol  == item.symbol.upper()
+              )
+              .first()
         )
 
-    # 2) See if we already hold this symbol
-    holding = (
-        db.query(Portfolio)
-          .filter(
-            Portfolio.user_id == current_user.id,
-            Portfolio.symbol  == item.symbol.upper()
-          )
-          .first()
-    )
-
-    # 3) Calculate stop loss price based on user's risk tolerance
-    stop_loss_price = 0
-    if current_user.risk_tolerance > 0 and current_user.capital > 0:
+        # 3) Calculate stop loss price based on user's risk tolerance
+        stop_loss_price = 0
         risk_amount = current_user.capital * (current_user.risk_tolerance / 100)
         stop_loss_price = item.price - (risk_amount / item.shares)
 
-    # 4) Build the transaction record
-    txn = PortfolioTransaction(
-        portfolio_id     = holding.id if holding else None,
-        transaction_type = "buy",
-        shares           = item.shares,
-        price_per_share  = item.price,
-        total_amount     = item.shares * item.price,
-        transaction_date = item.date
-    )
-
-    if holding:
-        # — Attach new txn and recalc aggregates —
-        db.add(txn)
-        all_txns = (
-            db.query(PortfolioTransaction)
-              .filter(PortfolioTransaction.portfolio_id == holding.id)
-              .all()
+        # 4) Build the transaction record
+        txn = PortfolioTransaction(
+            portfolio_id     = holding.id if holding else None,
+            transaction_type = "buy",
+            shares           = item.shares,
+            price_per_share  = item.price,
+            total_amount     = item.shares * item.price,
+            transaction_date = item.date
         )
-        total_shares = sum(t.shares for t in all_txns)
-        total_cost   = sum(t.total_amount for t in all_txns)
 
-        holding.total_shares  = total_shares
-        holding.average_price = (total_cost / total_shares) if total_shares else 0
-        holding.company_name  = info["name"]
-        holding.stop_loss_price = stop_loss_price
+        if holding:
+            # — Attach new txn and recalc aggregates —
+            db.add(txn)
+            all_txns = (
+                db.query(PortfolioTransaction)
+                  .filter(PortfolioTransaction.portfolio_id == holding.id)
+                  .all()
+            )
+            total_shares = sum(t.shares for t in all_txns)
+            total_cost   = sum(t.total_amount for t in all_txns)
 
+            holding.total_shares  = total_shares
+            holding.average_price = (total_cost / total_shares) if total_shares else 0
+            holding.company_name  = info["name"]
+            holding.stop_loss_price = stop_loss_price
+
+        else:
+            # — Create new holding first —
+            holding = Portfolio(
+                user_id       = current_user.id,
+                symbol        = item.symbol.upper(),
+                company_name  = info["name"],
+                total_shares  = item.shares,
+                average_price = item.price,
+                stop_loss_price = stop_loss_price
+            )
+            db.add(holding)
+            db.flush()  # now holding.id exists
+
+            txn.portfolio_id = holding.id
+            db.add(txn)
+
+        db.commit()
+        db.refresh(holding)
+        return holding
     else:
-        # — Create new holding first —
-        holding = Portfolio(
-            user_id       = current_user.id,
-            symbol        = item.symbol.upper(),
-            company_name  = info["name"],
-            total_shares  = item.shares,
-            average_price = item.price,
-            stop_loss_price = stop_loss_price
-        )
-        db.add(holding)
-        db.flush()  # now holding.id exists
-
-        txn.portfolio_id = holding.id
-        db.add(txn)
-
-    db.commit()
-    db.refresh(holding)
-    return holding
+        # Handle the case where values are missing or invalid
+        return JSONResponse(status_code=400, content={"detail": "Please set your risk tolerance and capital in your profile before adding stocks."})
 
 @router.get("/stocks/{symbol}", response_model=PortfolioWithTransactions)
 def get_portfolio_stock(
