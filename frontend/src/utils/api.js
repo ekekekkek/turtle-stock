@@ -93,6 +93,8 @@ export const portfolioAPI = {
   getPositionSize: (data) => api.post('/api/portfolio/position-size', data),
   sellStock: (symbol, data) => api.post(`/api/portfolio/stocks/${symbol}/sell`, data),
   getTradeHistory: () => api.get('/api/portfolio/trade-history'),
+  addUpStock: ({ symbol, shares, price, date }) =>
+    api.post(`/api/portfolio/stocks/${symbol}/addup`, { symbol, shares, price, date }),
 };
 
 // Watchlist-related API functions

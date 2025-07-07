@@ -7,6 +7,7 @@ import AddStockModal from '../components/AddStockModal'
 import { Dialog } from '@headlessui/react'
 import { BarChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, CartesianGrid } from 'recharts'
 import EditSellStockModal from '../components/EditSellStockModal'
+import AddUpModal from '../components/AddUpModal'
 
 const extractErrorMessage = (err, fallback) => {
   const detail = err.response?.data?.detail
@@ -27,6 +28,8 @@ export default function Portfolio() {
   const [editSettings, setEditSettings] = useState({ capital: 0, risk_tolerance: 0 })
   const [showEditSellModal, setShowEditSellModal] = useState(false)
   const [selectedHolding, setSelectedHolding] = useState(null)
+  const [showAddUpModal, setShowAddUpModal] = useState(false)
+  const [selectedAddUpHolding, setSelectedAddUpHolding] = useState(null)
 
   const loadPerformance = async () => {
     try {
@@ -248,6 +251,13 @@ export default function Portfolio() {
             >
               <PencilIcon className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => { setSelectedAddUpHolding(h); setShowAddUpModal(true) }}
+              className="absolute top-2 right-18 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+              title="Add-up"
+            >
+              <PlusIcon className="w-4 h-4" />
+            </button>
             <div>
               <h4 className="text-lg font-semibold">{h.symbol}</h4>
               <p className="text-sm text-gray-500">Shares: {h.shares}</p>
@@ -256,7 +266,8 @@ export default function Portfolio() {
               <p>Avg Price: ${h.average_price.toFixed(2)}</p>
               <p>Current: ${h.current_price.toFixed(2)}</p>
               <p>Value: ${(h.shares * h.current_price).toLocaleString()}</p>
-              <p className="text-sm text-blue-600">Stop Loss: ${h.stop_loss_price?.toFixed(2) ?? '-'}</p>
+              <p className="text-sm text-red-600">Stop Loss: ${h.stop_loss_price?.toFixed(2) ?? '-'}</p>
+              <p className="text-sm text-green-600">Add-up Point: {h.atr != null ? `$${(h.average_price + h.atr).toFixed(2)}` : '-'}</p>
             </div>
             <p
               className={`mt-4 font-semibold ${
@@ -284,6 +295,14 @@ export default function Portfolio() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAddStock={handleAddStock}
+      />
+
+      {/* Add Up Modal */}
+      <AddUpModal
+        isOpen={showAddUpModal}
+        onClose={() => setShowAddUpModal(false)}
+        holding={selectedAddUpHolding}
+        onAddUp={() => { setShowAddUpModal(false); loadPerformance(); }}
       />
 
       {/* Trade History Chart */}

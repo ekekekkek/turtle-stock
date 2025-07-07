@@ -13,6 +13,7 @@ class Portfolio(Base):
     total_shares = Column(Float, default=0)
     average_price = Column(Float, default=0)
     stop_loss_price = Column(Float, default=0)  # Stop loss price per share
+    is_added_up = Column(Integer, default=0)  # 0 = not added up, 1 = added up
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

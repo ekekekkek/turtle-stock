@@ -238,54 +238,45 @@ class StockService:
             logger.error("Error calculating ATR for %s: %s", symbol, e)
             return None
 
-    def calculate_distributed_risk(self, user_id: int, db: Session, new_symbol: str = None) -> Dict[str, float]:
+    def calculate_distributed_risk(self, user_id: int, db: Session, new_symbol: str = None, exclude_symbols: list = None) -> Dict[str, float]:
         """
         Calculate risk distribution across all stocks in user's portfolio.
         If total risk is 1%, and user has n stocks, each stock gets 1/n% risk.
-        
-        Args:
-            user_id: User ID
-            db: Database session
-            new_symbol: Optional new symbol being added (for preview calculation)
-            
-        Returns:
-            Dictionary with risk amounts for each stock
+        Optionally exclude certain symbols (e.g., those that have been added up).
         """
         # Get user's risk settings
         user = db.query(User).filter(User.id == user_id).first()
         if not user or not user.capital or not user.risk_tolerance:
             return {}
-            
         total_capital = user.capital
         total_risk_percent = user.risk_tolerance
         total_risk_amount = total_capital * (total_risk_percent / 100)
-        
         # Get all current holdings
         holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
         current_symbols = [h.symbol for h in holdings]
-        
+        # Exclude symbols if provided
+        if exclude_symbols:
+            current_symbols = [s for s in current_symbols if s not in exclude_symbols]
         # If adding a new stock, include it in the calculation
         if new_symbol and new_symbol.upper() not in current_symbols:
             total_stocks = len(current_symbols) + 1
         else:
             total_stocks = len(current_symbols)
-            
         # If no stocks, return empty dict
         if total_stocks == 0:
             return {}
-            
         # Calculate risk per stock
         risk_per_stock = total_risk_amount / total_stocks
-        
         # Create result dictionary
         result = {}
         for holding in holdings:
-            result[holding.symbol] = risk_per_stock
-            
+            if exclude_symbols and holding.symbol in exclude_symbols:
+                continue
+            if holding.symbol in current_symbols:
+                result[holding.symbol] = risk_per_stock
         # If adding new stock, include it in result
         if new_symbol and new_symbol.upper() not in current_symbols:
             result[new_symbol.upper()] = risk_per_stock
-            
         return result
 
     def calculate_position_size_with_distributed_risk(self, symbol: str, user_id: int, db: Session, 

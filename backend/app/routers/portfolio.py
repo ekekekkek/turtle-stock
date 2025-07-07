@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.core.database import get_db
@@ -12,22 +12,22 @@ from app.schemas.portfolio import (
 )
 from app.services.stock_service import stock_service
 from fastapi.responses import JSONResponse
+import logging
 
 router = APIRouter()
 
 def _update_all_holdings_stop_loss(user_id: int, db: Session):
-    """Update stop loss prices for all holdings based on distributed risk"""
+    """Update stop loss prices for all holdings based on distributed risk, only for not-added-up holdings"""
     from app.models.portfolio import Portfolio
     from app.models.portfolio import PortfolioTransaction
     
     # Get all holdings for the user
     holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
-    
-    # Calculate distributed risk
-    distributed_risk = stock_service.calculate_distributed_risk(user_id, db)
+    # Only include not-added-up holdings for risk distribution
+    not_added_up_symbols = [h.symbol for h in holdings if not h.is_added_up]
+    distributed_risk = stock_service.calculate_distributed_risk(user_id, db, exclude_symbols=[h.symbol for h in holdings if h.is_added_up])
     if not distributed_risk:
         return
-    
     # Update each holding's stop loss price
     for holding in holdings:
         if holding.symbol in distributed_risk:
@@ -36,7 +36,6 @@ def _update_all_holdings_stop_loss(user_id: int, db: Session):
                 # Calculate new stop loss price based on distributed risk
                 new_stop_loss_price = holding.average_price - (stock_risk_amount / holding.total_shares)
                 holding.stop_loss_price = new_stop_loss_price
-    
     db.commit()
 
 @router.get("/", response_model=List[PortfolioWithTransactions])
@@ -116,7 +115,10 @@ def add_stock_to_portfolio(
             db.add(txn)
             all_txns = (
                 db.query(PortfolioTransaction)
-                  .filter(PortfolioTransaction.portfolio_id == holding.id)
+                  .filter(
+                      PortfolioTransaction.portfolio_id == holding.id,
+                      PortfolioTransaction.transaction_type == "buy"
+                  )
                   .all()
             )
             total_shares = sum(t.shares for t in all_txns)
@@ -258,6 +260,9 @@ def get_portfolio_performance(
         current  = h.total_shares * quote["price"]
         gain     = current - invested
 
+        # Calculate ATR for this symbol (default window=14)
+        atr = stock_service.calculate_atr(h.symbol, 14)
+
         summary["holdings"].append({
             "symbol":             h.symbol,
             "shares":             h.total_shares,
@@ -268,6 +273,7 @@ def get_portfolio_performance(
             "gain_loss":          gain,
             "gain_loss_percent":  (gain / invested * 100) if invested else 0,
             "stop_loss_price":    h.stop_loss_price,
+            "atr":                atr,
         })
         total_invested += invested
         total_current  += current
@@ -490,3 +496,67 @@ def get_trade_history(
           .all()
     )
     return trades
+
+@router.post("/stocks/{symbol}/addup", response_model=PortfolioResponse)
+def add_up_stock(
+    symbol: str,
+    data: PortfolioCreate = Body(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Add up shares to an existing holding, enforcing pyramid rule (add-up shares < current shares)"""
+    logger = logging.getLogger("portfolio.add_up_stock")
+    holding = (
+        db.query(Portfolio)
+          .filter(
+            Portfolio.user_id == current_user.id,
+            Portfolio.symbol == symbol.upper()
+          )
+          .first()
+    )
+    if not holding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No holding for {symbol}"
+        )
+    if data.shares >= holding.total_shares:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Add-up shares ({data.shares}) must be less than current shares ({holding.total_shares}) for pyramid structure."
+        )
+    logger.info(f"[ADDP] BEFORE: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}")
+    # Add transaction
+    txn = PortfolioTransaction(
+        portfolio_id=holding.id,
+        transaction_type="buy",
+        shares=data.shares,
+        price_per_share=data.price,
+        total_amount=data.shares * data.price,
+        transaction_date=data.date
+    )
+    db.add(txn)
+    db.refresh(holding)  # Ensure latest state before aggregation
+    # Recalculate aggregates
+    all_txns = (
+        db.query(PortfolioTransaction)
+          .filter(
+              PortfolioTransaction.portfolio_id == holding.id,
+              PortfolioTransaction.transaction_type == "buy"
+          )
+          .all()
+    )
+    logger.info(f"[ADDP] NUM TRANSACTIONS: {len(all_txns)}")
+    logger.info(f"[ADDP] TRANSACTIONS: {[{'shares': t.shares, 'price': t.price_per_share, 'total': t.total_amount, 'date': t.transaction_date} for t in all_txns]}")
+    total_shares = sum(t.shares for t in all_txns)
+    total_cost   = sum(t.total_amount for t in all_txns)
+    holding.total_shares  = total_shares
+    holding.average_price = (total_cost / total_shares) if total_shares else 0
+    holding.is_added_up = 1
+    # Set stop loss to 15% below the add-up price
+    holding.stop_loss_price = data.price * 0.90
+    db.commit()
+    db.refresh(holding)
+    logger.info(f"[ADDP] AFTER: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}")
+    # Recalculate stop loss for all not-added-up holdings
+    _update_all_holdings_stop_loss(current_user.id, db)
+    return holding
