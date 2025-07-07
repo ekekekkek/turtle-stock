@@ -15,6 +15,30 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
+def _update_all_holdings_stop_loss(user_id: int, db: Session):
+    """Update stop loss prices for all holdings based on distributed risk"""
+    from app.models.portfolio import Portfolio
+    from app.models.portfolio import PortfolioTransaction
+    
+    # Get all holdings for the user
+    holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
+    
+    # Calculate distributed risk
+    distributed_risk = stock_service.calculate_distributed_risk(user_id, db)
+    if not distributed_risk:
+        return
+    
+    # Update each holding's stop loss price
+    for holding in holdings:
+        if holding.symbol in distributed_risk:
+            stock_risk_amount = distributed_risk[holding.symbol]
+            if holding.total_shares > 0:
+                # Calculate new stop loss price based on distributed risk
+                new_stop_loss_price = holding.average_price - (stock_risk_amount / holding.total_shares)
+                holding.stop_loss_price = new_stop_loss_price
+    
+    db.commit()
+
 @router.get("/", response_model=List[PortfolioWithTransactions])
 def get_user_portfolio(
     current_user: User = Depends(get_current_active_user),
@@ -60,10 +84,22 @@ def add_stock_to_portfolio(
               .first()
         )
 
-        # 3) Calculate stop loss price based on user's risk tolerance
+        # 3) Calculate stop loss price based on distributed risk across all stocks
         stop_loss_price = 0
-        risk_amount = current_user.capital * (current_user.risk_tolerance / 100)
-        stop_loss_price = item.price - (risk_amount / item.shares)
+        
+        # Calculate distributed risk across all stocks
+        distributed_risk = stock_service.calculate_distributed_risk(current_user.id, db, item.symbol.upper())
+        if not distributed_risk or item.symbol.upper() not in distributed_risk:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to calculate distributed risk"
+            )
+        
+        # Get risk amount for this specific stock
+        stock_risk_amount = distributed_risk[item.symbol.upper()]
+        
+        # Calculate stop loss price based on distributed risk
+        stop_loss_price = item.price - (stock_risk_amount / item.shares)
 
         # 4) Build the transaction record
         txn = PortfolioTransaction(
@@ -90,6 +126,9 @@ def add_stock_to_portfolio(
             holding.average_price = (total_cost / total_shares) if total_shares else 0
             holding.company_name  = info["name"]
             holding.stop_loss_price = stop_loss_price
+            
+            # Update stop loss prices for all existing holdings based on new distributed risk
+            _update_all_holdings_stop_loss(current_user.id, db)
 
         else:
             # — Create new holding first —
@@ -108,6 +147,10 @@ def add_stock_to_portfolio(
             db.add(txn)
 
         db.commit()
+        
+        # Update stop loss prices for all holdings based on new distributed risk
+        _update_all_holdings_stop_loss(current_user.id, db)
+        
         db.refresh(holding)
         return holding
     else:
@@ -184,6 +227,10 @@ def remove_stock_from_portfolio(
         )
     db.delete(holding)
     db.commit()
+    
+    # Recalculate stop loss prices for all remaining holdings after deletion
+    _update_all_holdings_stop_loss(current_user.id, db)
+    
     return {"message": f"{symbol.upper()} removed from portfolio"}
 
 @router.get("/performance", response_model=PortfolioPerformanceResponse)
@@ -277,11 +324,14 @@ def update_user_settings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Update user's portfolio settings"""
+    """Update user's portfolio settings and recalculate all stop loss prices"""
     current_user.capital = settings.capital
     current_user.risk_tolerance = settings.risk_tolerance
     db.commit()
     db.refresh(current_user)
+    
+    # Recalculate stop loss prices for all holdings based on new risk settings
+    _update_all_holdings_stop_loss(current_user.id, db)
     
     return UserSettingsResponse(
         capital=current_user.capital,
@@ -293,10 +343,13 @@ def update_user_settings(
 def calculate_position_size(
     request: PositionSizeRequest,
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
-    """Calculate recommended position size based on volatility"""
-    result = stock_service.calculate_position_size(
+    """Calculate recommended position size based on distributed risk"""
+    result = stock_service.calculate_position_size_with_distributed_risk(
         request.symbol, 
+        current_user.id,
+        db,
         request.capital, 
         request.risk_percent, 
         request.window
@@ -309,6 +362,37 @@ def calculate_position_size(
         )
     
     return PositionSizeResponse(**result)
+
+@router.get("/risk-distribution")
+def get_risk_distribution(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Get current risk distribution across all stocks in portfolio"""
+    distributed_risk = stock_service.calculate_distributed_risk(current_user.id, db)
+    
+    # Get all holdings for context
+    holdings = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).all()
+    holdings_info = []
+    
+    for holding in holdings:
+        holdings_info.append({
+            "symbol": holding.symbol,
+            "shares": holding.total_shares,
+            "average_price": holding.average_price,
+            "stop_loss_price": holding.stop_loss_price,
+            "risk_amount": distributed_risk.get(holding.symbol, 0)
+        })
+    
+    return {
+        "total_capital": current_user.capital,
+        "total_risk_percent": current_user.risk_tolerance,
+        "total_risk_amount": current_user.capital * (current_user.risk_tolerance / 100),
+        "number_of_stocks": len(holdings),
+        "risk_per_stock": distributed_risk.get(list(distributed_risk.keys())[0], 0) if distributed_risk else 0,
+        "holdings": holdings_info,
+        "distributed_risk": distributed_risk
+    }
 
 @router.post("/stocks/{symbol}/sell", response_model=TradeHistoryResponse)
 def sell_stock(
@@ -385,6 +469,10 @@ def sell_stock(
     db.add(trade_record)
     
     db.commit()
+    
+    # Recalculate stop loss prices for all remaining holdings after selling
+    _update_all_holdings_stop_loss(current_user.id, db)
+    
     db.refresh(trade_record)
     
     return trade_record

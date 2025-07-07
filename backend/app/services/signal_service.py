@@ -153,12 +153,25 @@ class SignalService:
         cond4 = close >= 0.97 * high_52w if high_52w else False
         return cond1 and cond2 and cond3 and cond4
 
-    def calculate_position_size(self, close, stop_loss, risk_tolerance, capital):
-        """Calculate position size based on risk management"""
+    def calculate_position_size(self, close, stop_loss, risk_tolerance, capital, user_id=None, db=None, symbol=None):
+        """Calculate position size based on distributed risk management"""
         if close is None or stop_loss is None or risk_tolerance is None or capital is None:
             return 0
         if not stop_loss or stop_loss <= 0:
             return 0
+            
+        # If we have user_id, db, and symbol, use distributed risk
+        if user_id and db and symbol:
+            from app.services.stock_service import stock_service
+            distributed_risk = stock_service.calculate_distributed_risk(user_id, db, symbol)
+            if distributed_risk and symbol.upper() in distributed_risk:
+                stock_risk_amount = distributed_risk[symbol.upper()]
+                risk_per_share = close - stop_loss
+                if risk_per_share <= 0:
+                    return 0
+                return int(stock_risk_amount / risk_per_share)
+        
+        # Fallback to original calculation if distributed risk not available
         risk = risk_tolerance / 100
         risk_per_share = close - stop_loss
         if risk_per_share <= 0:
@@ -230,9 +243,10 @@ class SignalService:
                 
                 # Create signal for all users
                 for user in db.query(User).all():
-                    # Calculate personalized position size based on user's risk tolerance and capital
+                    # Calculate personalized position size based on distributed risk
                     user_position_size = self.calculate_position_size(
-                        close, stop_loss, user.risk_tolerance, user.capital
+                        close, stop_loss, user.risk_tolerance, user.capital,
+                        user.id, db, symbol
                     )
                     
                     signal = Signal(

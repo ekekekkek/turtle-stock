@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import date, datetime
 
 class PortfolioBase(BaseModel):
@@ -73,6 +73,8 @@ class PositionSizeResponse(BaseModel):
     position_value: float
     risk_amount: float
     stop_loss_distance: float
+    volatility_source: Optional[str] = None
+    distributed_risk: Optional[Dict[str, float]] = None
 
 class SellStockRequest(BaseModel):
     shares: float = Field(..., gt=0)

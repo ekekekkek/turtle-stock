@@ -7,6 +7,9 @@ import yfinance as yf
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from app.core.config import settings
+from sqlalchemy.orm import Session
+from app.models.portfolio import Portfolio
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -235,9 +238,61 @@ class StockService:
             logger.error("Error calculating ATR for %s: %s", symbol, e)
             return None
 
-    def calculate_position_size(self, symbol: str, capital: float, risk_percent: float, window: int = 14) -> Dict[str, Any]:
+    def calculate_distributed_risk(self, user_id: int, db: Session, new_symbol: str = None) -> Dict[str, float]:
         """
-        Calculate recommended position size based on volatility and risk management
+        Calculate risk distribution across all stocks in user's portfolio.
+        If total risk is 1%, and user has n stocks, each stock gets 1/n% risk.
+        
+        Args:
+            user_id: User ID
+            db: Database session
+            new_symbol: Optional new symbol being added (for preview calculation)
+            
+        Returns:
+            Dictionary with risk amounts for each stock
+        """
+        # Get user's risk settings
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.capital or not user.risk_tolerance:
+            return {}
+            
+        total_capital = user.capital
+        total_risk_percent = user.risk_tolerance
+        total_risk_amount = total_capital * (total_risk_percent / 100)
+        
+        # Get all current holdings
+        holdings = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
+        current_symbols = [h.symbol for h in holdings]
+        
+        # If adding a new stock, include it in the calculation
+        if new_symbol and new_symbol.upper() not in current_symbols:
+            total_stocks = len(current_symbols) + 1
+        else:
+            total_stocks = len(current_symbols)
+            
+        # If no stocks, return empty dict
+        if total_stocks == 0:
+            return {}
+            
+        # Calculate risk per stock
+        risk_per_stock = total_risk_amount / total_stocks
+        
+        # Create result dictionary
+        result = {}
+        for holding in holdings:
+            result[holding.symbol] = risk_per_stock
+            
+        # If adding new stock, include it in result
+        if new_symbol and new_symbol.upper() not in current_symbols:
+            result[new_symbol.upper()] = risk_per_stock
+            
+        return result
+
+    def calculate_position_size_with_distributed_risk(self, symbol: str, user_id: int, db: Session, 
+                                                   capital: float, risk_percent: float, 
+                                                   window: int = 14) -> Dict[str, Any]:
+        """
+        Calculate position size with distributed risk across all stocks
         """
         try:
             # Get current price
@@ -247,18 +302,64 @@ class StockService:
 
             current_price = quote["price"]
             
-            # Calculate ATR
+            # Calculate distributed risk
+            distributed_risk = self.calculate_distributed_risk(user_id, db, symbol)
+            if not distributed_risk or symbol.upper() not in distributed_risk:
+                return {"error": "Unable to calculate distributed risk"}
+                
+            # Get risk amount for this specific stock
+            stock_risk_amount = distributed_risk[symbol.upper()]
+            
+            # Try multiple approaches for volatility calculation
+            atr = None
+            volatility_source = "ATR"
+            
+            # 1. Try ATR calculation first (most accurate)
             atr = self.calculate_atr(symbol, window)
+            
+            # 2. If ATR fails, try to get recent price data for better estimation
             if not atr:
-                return {"error": "Unable to calculate volatility"}
-
+                logger.warning(f"ATR calculation failed for {symbol}, trying alternative volatility estimation")
+                
+                # Try to get just a few days of recent data for better estimation
+                try:
+                    end_ts = int(datetime.now(timezone.utc).timestamp())
+                    start_ts = end_ts - 7 * 24 * 3600  # Just 7 days
+                    
+                    history = self.get_stock_history(symbol, start_ts, end_ts, "D")
+                    if history and len(history["data"]) >= 3:
+                        # Calculate simple volatility from recent data
+                        prices = [d["close"] for d in history["data"]]
+                        price_changes = [abs(prices[i] - prices[i-1]) for i in range(1, len(prices))]
+                        if price_changes:
+                            avg_change = sum(price_changes) / len(price_changes)
+                            atr = avg_change * 1.5  # Approximate ATR
+                            volatility_source = "Recent Data"
+                            logger.info(f"Using recent data volatility for {symbol}: {atr:.2f}")
+                
+                except Exception as e:
+                    logger.warning(f"Recent data calculation failed for {symbol}: {e}")
+            
+            # 3. Final fallback: use dynamic volatility based on stock price
+            if not atr:
+                # More sophisticated fallback: higher volatility for higher-priced stocks
+                if current_price > 100:
+                    volatility_percent = 0.025  # 2.5% for high-priced stocks
+                elif current_price > 50:
+                    volatility_percent = 0.03   # 3% for mid-priced stocks
+                else:
+                    volatility_percent = 0.04   # 4% for low-priced stocks
+                
+                atr = current_price * volatility_percent
+                volatility_source = "Dynamic Fallback"
+                logger.warning(f"Using dynamic fallback volatility for {symbol}: {atr:.2f} ({volatility_percent*100}%)")
+            
             # Calculate stop loss distance (2 * ATR below entry)
             stop_loss_distance = 2 * atr
             stop_loss_price = current_price - stop_loss_distance
 
-            # Calculate position size based on risk
-            risk_amount = capital * (risk_percent / 100)
-            position_size = risk_amount / stop_loss_distance
+            # Calculate position size based on distributed risk
+            position_size = stock_risk_amount / stop_loss_distance
 
             # Ensure position doesn't exceed capital
             max_position_value = capital
@@ -272,13 +373,15 @@ class StockService:
                 "stop_loss_price": stop_loss_price,
                 "recommended_shares": round(position_size, 2),
                 "position_value": round(position_size * current_price, 2),
-                "risk_amount": risk_amount,
-                "stop_loss_distance": stop_loss_distance
+                "risk_amount": stock_risk_amount,
+                "stop_loss_distance": stop_loss_distance,
+                "volatility_source": volatility_source,
+                "distributed_risk": distributed_risk  # Include full risk distribution
             }
 
         except Exception as e:
-            logger.error("Error calculating position size for %s: %s", symbol, e)
-            return {"error": "Unable to calculate position size"}
+            logger.error("Error calculating position size with distributed risk for %s: %s", symbol, e)
+            return {"error": "Unable to calculate position size with distributed risk"}
 
     def search_stocks(self, query: str) -> List[Dict[str, Any]]:
         """Search for symbols/company names via Finnhub lookup"""

@@ -248,10 +248,15 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                           <span className="text-blue-600 text-xs font-medium">Current Price</span>
                           <div className="text-blue-900 font-semibold">${positionSizeData.current_price.toFixed(2)}</div>
                         </div>
-                        <div className="bg-white rounded p-2 border border-blue-100">
-                          <span className="text-blue-600 text-xs font-medium">ATR (Volatility)</span>
-                          <div className="text-blue-900 font-semibold">${positionSizeData.atr.toFixed(2)}</div>
+                                            <div className="bg-white rounded p-2 border border-blue-100">
+                      <span className="text-blue-600 text-xs font-medium">ATR (Volatility)</span>
+                      <div className="text-blue-900 font-semibold">${positionSizeData.atr.toFixed(2)}</div>
+                      {positionSizeData.volatility_source && (
+                        <div className="text-blue-500 text-xs mt-1">
+                          Source: {positionSizeData.volatility_source}
                         </div>
+                      )}
+                    </div>
                         <div className="bg-white rounded p-2 border border-blue-100">
                           <span className="text-blue-600 text-xs font-medium">Stop Loss Price</span>
                           <div className="text-blue-900 font-semibold">${positionSizeData.stop_loss_price.toFixed(2)}</div>
