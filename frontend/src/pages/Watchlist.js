@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { watchlistAPI, stockAPI, signalsAPI } from '../utils/api';
 import StockCard from '../components/StockCard';
-import { EyeIcon, PlusIcon, MagnifyingGlassIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PlusIcon, MagnifyingGlassIcon, SparklesIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,9 +27,18 @@ const Watchlist = () => {
   const [addingStock, setAddingStock] = useState(false);
   const [lastRun, setLastRun] = useState(null);
   const [signalsRequested, setSignalsRequested] = useState(false);
+  const [showHold, setShowHold] = useState(false);
 
   useEffect(() => {
     fetchWatchlist();
+  }, [isAuthenticated]);
+
+  // Auto-fetch daily signals on load if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      handleGetSignals();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   const fetchWatchlist = async () => {
@@ -186,13 +195,23 @@ const Watchlist = () => {
               <SparklesIcon className="w-6 h-6 text-yellow-600 mr-2" />
               <h2 className="text-xl font-semibold text-yellow-800">Daily Market Analysis</h2>
             </div>
-            <button
-              onClick={handleGetSignals}
-              disabled={signalsLoading}
-              className="text-sm text-yellow-700 hover:text-yellow-800 underline"
-            >
-              {signalsLoading ? 'Loading...' : 'Refresh'}
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleGetSignals}
+                disabled={signalsLoading}
+                className="text-sm text-yellow-700 hover:text-yellow-800 underline"
+              >
+                {signalsLoading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => setShowHold((prev) => !prev)}
+                className="text-sm text-yellow-700 hover:text-yellow-800 underline flex items-center"
+                aria-expanded={showHold}
+              >
+                {showHold ? <ChevronUpIcon className="w-4 h-4 mr-1" /> : <ChevronDownIcon className="w-4 h-4 mr-1" />}
+                {showHold ? 'Collapse HOLD' : 'Expand HOLD'}
+              </button>
+            </div>
           </div>
           
           {signals.length > 0 ? (
@@ -218,7 +237,7 @@ const Watchlist = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {signals.map(sig => (
+                    {(showHold ? signals : signals.filter(sig => sig.signal_triggered)).map(sig => (
                       <tr key={sig.id} className="border-b border-yellow-200 hover:bg-yellow-50">
                         <td className="px-3 py-2 font-bold text-blue-600">{sig.symbol}</td>
                         <td className="px-3 py-2 text-right">${sig.close?.toFixed(2)}</td>

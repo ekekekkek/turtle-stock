@@ -30,10 +30,10 @@ async def lifespan(app: FastAPI):
             signal_service.generate_daily_market_analysis(db)
         finally:
             db.close()
-    # Run every day at 6:30pm US Eastern Time
-    scheduler.add_job(daily_market_job, CronTrigger(hour=18, minute=30))
+    # Run every day at 5:00pm US Eastern Time
+    scheduler.add_job(daily_market_job, CronTrigger(hour=17, minute=0))
     scheduler.start()
-    print("Scheduler started: daily market analysis at 6:30pm US/Eastern")
+    print("Scheduler started: daily market analysis at 5:00pm US/Eastern")
     yield
     # --- shutdown ---
     print("Shutting down Turtle Stock Platform...")
