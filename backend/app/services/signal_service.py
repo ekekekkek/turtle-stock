@@ -54,12 +54,16 @@ class SignalService:
     def _get_ohlcv_from_yahoo(self, symbol: str, days: int = 252):
         """Fetch daily OHLCV data from Yahoo Finance (no rate limits)"""
         try:
+            print(f"DEBUG: Fetching {days} days of data for {symbol} from Yahoo Finance")
+            
             # Add small delay to prevent overwhelming Yahoo Finance
             time.sleep(0.1)
             
             # Calculate date range
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days)
+            
+            print(f"DEBUG: Date range for {symbol}: {start_date.date()} to {end_date.date()}")
             
             # Get data from Yahoo Finance with better error handling
             ticker = yf.Ticker(symbol)
@@ -68,18 +72,22 @@ class SignalService:
             try:
                 info = ticker.info
                 if not info or 'regularMarketPrice' not in info:
-                    print(f"Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                    print(f"WARNING: Invalid symbol or no data available for {symbol} on Yahoo Finance")
                     return None
+                print(f"DEBUG: {symbol} info validated successfully")
             except Exception as e:
-                print(f"Could not validate symbol {symbol} on Yahoo Finance: {e}")
+                print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance: {e}")
                 return None
             
             # Get historical data
+            print(f"DEBUG: Fetching historical data for {symbol}...")
             hist = ticker.history(start=start_date, end=end_date, interval='1d')
             
             if hist.empty:
-                print(f"No data returned from Yahoo Finance for {symbol}")
+                print(f"WARNING: No data returned from Yahoo Finance for {symbol}")
                 return None
+            
+            print(f"DEBUG: {symbol} - Retrieved {len(hist)} data points")
             
             # Convert to Finnhub format
             timestamps = [int(dt.timestamp()) for dt in hist.index]
@@ -89,17 +97,22 @@ class SignalService:
             closes = hist['Close'].tolist()
             volumes = hist['Volume'].tolist()
             
-            return {
+            result = {
                 's': 'ok',
                 't': timestamps,
                 'o': opens,
                 'h': highs,
                 'l': lows,
                 'c': closes,
-                'v': volumes
+                'v': volumes,
+                'symbol': symbol
             }
+            
+            print(f"DEBUG: {symbol} - Data conversion completed, returning {len(closes)} close prices")
+            return result
+            
         except Exception as e:
-            print(f"Error fetching data from Yahoo Finance for {symbol}: {e}")
+            print(f"ERROR: Error fetching data from Yahoo Finance for {symbol}: {e}")
             return None
 
     def initialize_stock_lists(self):
@@ -123,7 +136,7 @@ class SignalService:
             # Fallback to basic list
             self.all_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
     
-    def fetch_ohlcv(self, symbol: str, days: int = 252):
+    def fetch_ohlcv(self, symbol: str, days: int = 400):
         """Fetch daily OHLCV data using Yahoo Finance (no rate limits)"""
         print(f"Fetching {days} days of data for {symbol} from Yahoo Finance")
         return self._get_ohlcv_from_yahoo(symbol, days)
@@ -132,6 +145,24 @@ class SignalService:
         closes = np.array(ohlcv['c'])
         highs = np.array(ohlcv['h'])
         lows = np.array(ohlcv['l'])
+        
+        symbol = ohlcv.get('symbol', 'unknown')
+        data_length = len(closes)
+        
+        print(f"DEBUG: Calculating indicators for {symbol} with {data_length} days of data")
+        
+        # Check if we have enough data for all indicators
+        if data_length < 252:
+            print(f"WARNING: Not enough data to calculate 52w high and 200d SMA for {symbol} (len={data_length})")
+        if data_length < 200:
+            print(f"WARNING: Not enough data to calculate 200d SMA for {symbol} (len={data_length})")
+        if data_length < 50:
+            print(f"WARNING: Not enough data to calculate 50d SMA for {symbol} (len={data_length})")
+        if data_length < 20:
+            print(f"WARNING: Not enough data to calculate 20d high for {symbol} (len={data_length})")
+        if data_length < 15:
+            print(f"WARNING: Not enough data to calculate ATR for {symbol} (len={data_length})")
+        
         # 20-day high
         high_20d = float(np.max(closes[-20:])) if len(closes) >= 20 else None
         # 50-day SMA
@@ -143,6 +174,9 @@ class SignalService:
         # ATR (14-day)
         tr = np.maximum(highs[1:] - lows[1:], np.abs(highs[1:] - closes[:-1]), np.abs(lows[1:] - closes[:-1]))
         atr = float(np.mean(tr[-14:])) if len(tr) >= 14 else None
+        
+        print(f"DEBUG: {symbol} indicators - 20d High: {high_20d}, 50d SMA: {sma_50d}, 200d SMA: {sma_200d}, 52w High: {high_52w}, ATR: {atr}")
+        
         return high_20d, sma_50d, sma_200d, high_52w, atr
 
     def check_signal_conditions(self, close, high_20d, sma_50d, sma_200d, high_52w):

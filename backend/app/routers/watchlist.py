@@ -79,13 +79,13 @@ def get_watchlist_quotes(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get current quotes for all stocks in watchlist"""
+    """Get current quotes for all stocks in watchlist with technical indicators"""
     watchlist = db.query(Watchlist).filter(Watchlist.user_id == current_user.id).all()
     
     quotes = []
     for item in watchlist:
-        # try live lookup...
-        quote = stock_service.get_stock_quote(item.symbol)
+        # try enhanced lookup with technical indicators...
+        quote = stock_service.get_enhanced_stock_quote(item.symbol)
         # ...but if it failed, return a zero‐filled stub instead
         if quote is None:
             from datetime import datetime
@@ -100,7 +100,12 @@ def get_watchlist_quotes(
                 "low":            None,
                 "open":           None,
                 "previous_close": None,
-                "timestamp":      datetime.utcnow()
+                "timestamp":      datetime.utcnow(),
+                "high_20d":       0.0,
+                "sma_50d":        0.0,
+                "sma_200d":       0.0,
+                "high_52w":       0.0,
+                "atr":            0.0
             }
         # always include the stored company_name
         quote["company_name"] = item.company_name

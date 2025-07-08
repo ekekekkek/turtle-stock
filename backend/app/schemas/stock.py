@@ -14,6 +14,12 @@ class StockQuote(BaseModel):
     open: Optional[float] = None
     previous_close: Optional[float] = None
     timestamp: datetime
+    # Technical indicators
+    high_20d: Optional[float] = None
+    sma_50d: Optional[float] = None
+    sma_200d: Optional[float] = None
+    high_52w: Optional[float] = None
+    atr: Optional[float] = None
 
 class StockInfo(BaseModel):
     symbol: str

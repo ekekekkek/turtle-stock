@@ -10,7 +10,9 @@ const StockCard = ({ stock }) => {
     change = 0,
     changePercent,    // might be undefined
     volume = 0,
-    marketCap         // might be undefined
+    marketCap,         // might be undefined
+    sma_200d,
+    high_52w
   } = stock;
 
   // fall back to snake_case props or sensible defaults
@@ -45,6 +47,9 @@ const StockCard = ({ stock }) => {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(mc);
+
+  const sma200 = stock.sma_200d;
+  const high52w = stock.high_52w;
 
   return (
     <Link
@@ -82,6 +87,18 @@ const StockCard = ({ stock }) => {
           <p className="text-gray-500">Market Cap</p>
           <p className="font-medium text-gray-900">{formattedMarketCap}</p>
         </div>
+        {sma200 !== undefined && (
+          <div>
+            <p className="text-gray-500">200d SMA</p>
+            <p className="font-medium text-gray-900">{sma200 ? `$${sma200.toFixed(2)}` : 'N/A'}</p>
+          </div>
+        )}
+        {high52w !== undefined && (
+          <div>
+            <p className="text-gray-500">52w High</p>
+            <p className="font-medium text-gray-900">{high52w ? `$${high52w.toFixed(2)}` : 'N/A'}</p>
+          </div>
+        )}
       </div>
     </Link>
   );

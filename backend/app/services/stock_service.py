@@ -155,7 +155,7 @@ class StockService:
         if end_ts is None:
             end_ts = now
         if start_ts is None:
-            start_ts = end_ts - 30 * 24 * 3600  # 30 days ago
+            start_ts = end_ts - 400 * 24 * 3600  # full 1+ year of data
 
         # Try Yahoo Finance first (no rate limits, better for historical data)
         logger.info(f"Fetching historical data for {symbol} from Yahoo Finance")
@@ -206,7 +206,7 @@ class StockService:
         try:
             # Get more data for ATR calculation (need at least window + 1 days)
             end_ts = int(datetime.now(timezone.utc).timestamp())
-            start_ts = end_ts - (window + 10) * 24 * 3600  # Extra days for safety
+            start_ts = end_ts - (window * 2 + 5) * 24 * 3600  # Extra days for safety
             
             history = self.get_stock_history(symbol, start_ts, end_ts, "D")
             if not history or len(history["data"]) < window + 1:
@@ -428,5 +428,41 @@ class StockService:
                     "timestamp": datetime.now(timezone.utc)
                 }
         return overview
+
+    def get_enhanced_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Get enhanced stock quote with technical indicators (200d SMA, 52w High, etc.)"""
+        try:
+            # Get basic quote first
+            basic_quote = self.get_stock_quote(symbol)
+            if not basic_quote:
+                return None
+            
+            # Get historical data for technical indicators
+            from app.services.signal_service import signal_service
+            ohlcv = signal_service.fetch_ohlcv(symbol)
+            
+            if not ohlcv:
+                # If we can't get historical data, return basic quote
+                return basic_quote
+            
+            # Calculate technical indicators
+            high_20d, sma_50d, sma_200d, high_52w, atr = signal_service.calculate_indicators(ohlcv)
+            
+            # Add technical indicators to the quote
+            enhanced_quote = {
+                **basic_quote,
+                "high_20d": high_20d,
+                "sma_50d": sma_50d,
+                "sma_200d": sma_200d,
+                "high_52w": high_52w,
+                "atr": atr
+            }
+            
+            return enhanced_quote
+            
+        except Exception as e:
+            logger.error(f"Error getting enhanced quote for {symbol}: {e}")
+            # Fallback to basic quote
+            return self.get_stock_quote(symbol)
 
 stock_service = StockService()
