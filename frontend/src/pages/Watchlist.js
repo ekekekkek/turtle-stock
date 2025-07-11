@@ -231,8 +231,6 @@ const Watchlist = () => {
                       <th className="px-3 py-2 text-right">200d SMA</th>
                       <th className="px-3 py-2 text-right">52w High</th>
                       <th className="px-3 py-2 text-right">ATR</th>
-                      <th className="px-3 py-2 text-right">Stop Loss</th>
-                      <th className="px-3 py-2 text-right">Position Size</th>
                       <th className="px-3 py-2 text-center">Signal</th>
                     </tr>
                   </thead>
@@ -246,8 +244,6 @@ const Watchlist = () => {
                         <td className="px-3 py-2 text-right">${sig.sma_200d?.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right">${sig.high_52w?.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right">{sig.atr?.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right">${sig.stop_loss?.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-indigo-700">{sig.position_size}</td>
                         <td className="px-3 py-2 text-center">
                           {sig.signal_triggered ? (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">

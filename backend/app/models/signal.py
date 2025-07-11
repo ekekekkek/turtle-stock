@@ -16,8 +16,6 @@ class Signal(Base):
     sma_200d = Column(Float)
     high_52w = Column(Float)
     atr = Column(Float)
-    stop_loss = Column(Float)
-    position_size = Column(Integer)
     signal_triggered = Column(Integer, default=0)  # 1 if all 4 conditions met
 
     # Relationships

@@ -11,8 +11,6 @@ class SignalBase(BaseModel):
     sma_200d: float
     high_52w: float
     atr: float
-    stop_loss: float
-    position_size: int
     signal_triggered: int
 
 class SignalResponse(SignalBase):

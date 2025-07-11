@@ -293,8 +293,6 @@ class SignalService:
                         sma_200d=sma_200d or 0,
                         high_52w=high_52w or 0,
                         atr=atr or 0,
-                        stop_loss=stop_loss or 0,
-                        position_size=user_position_size,
                         signal_triggered=int(signal_triggered)
                     )
                     signals.append(signal)
