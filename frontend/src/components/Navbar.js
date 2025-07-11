@@ -18,9 +18,8 @@ const Navbar = () => {
   const { user, logout } = useAuth();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: ChartBarIcon },
+    { name: 'Portfolio', href: '/', icon: BriefcaseIcon },
     { name: 'Watchlist', href: '/watchlist', icon: EyeIcon },
-    { name: 'Portfolio', href: '/portfolio', icon: BriefcaseIcon },
   ];
 
   const isActive = (path) => location.pathname === path;

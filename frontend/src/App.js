@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
 import StockDetails from './pages/StockDetails';
 import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
@@ -65,7 +64,7 @@ const AppContent = () => {
             {/* Protected Routes */}
             <Route path="/" element={
               <ProtectedRoute>
-                <Dashboard />
+                <Portfolio />
               </ProtectedRoute>
             } />
             <Route path="/stock/:symbol" element={
@@ -76,11 +75,6 @@ const AppContent = () => {
             <Route path="/watchlist" element={
               <ProtectedRoute>
                 <Watchlist />
-              </ProtectedRoute>
-            } />
-            <Route path="/portfolio" element={
-              <ProtectedRoute>
-                <Portfolio />
               </ProtectedRoute>
             } />
             

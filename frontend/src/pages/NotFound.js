@@ -21,7 +21,7 @@ const NotFound = () => {
           className="inline-flex items-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
         >
           <HomeIcon className="w-5 h-5 mr-2" />
-          Go to Dashboard
+          Go to Portfolio
         </Link>
       </div>
     </div>
