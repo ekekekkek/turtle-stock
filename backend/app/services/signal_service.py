@@ -116,24 +116,13 @@ class SignalService:
             return None
 
     def initialize_stock_lists(self):
-        """Initialize S&P 500 and Nasdaq-100 stock lists"""
         try:
-            # Full S&P 500 list (as of 2024, static)
-            self.sp500_symbols = [
-                'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B', 'UNH', 'JNJ', 'JPM', 'V', 'PG', 'HD', 'MA', 'PFE', 'ABBV', 'AVGO', 'KO', 'PEP', 'COST', 'TMO', 'ACN', 'DHR', 'NEE', 'LLY', 'ABT', 'TXN', 'VZ', 'NKE', 'ADBE', 'HON', 'NFLX', 'PM', 'INTC', 'IBM', 'UNP', 'RTX', 'QCOM', 'AMD', 'T', 'INTU', 'AMGN', 'ISRG', 'SPY', 'VOO', 'IVV', 'QQQ', 'VTI', 'IWM', 'VEA', 'VWO', 'BND', 'GLD', 'SLV',
-                # ... (add all S&P 500 tickers here, truncated for brevity)
-            ]
-            # Nasdaq-100 list (as of 2024, static)
-            self.nasdaq_symbols = [
-                'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'ADBE', 'PYPL', 'INTC', 'AMD', 'CSCO', 'QCOM', 'AVGO', 'TXN', 'MU', 'KLAC', 'LRCX', 'AMAT', 'ADI', 'ASML', 'SNPS', 'CDNS', 'MCHP', 'MRVL', 'WDAY', 'ZM', 'TEAM', 'OKTA', 'CRWD', 'ZS', 'PLTR', 'SNOW', 'DDOG', 'NET', 'SQ', 'SHOP', 'ROKU', 'TTD', 'PINS', 'SNAP', 'UBER', 'LYFT', 'DASH', 'ABNB', 'GOOG', 'REGN', 'VRTX', 'SBUX', 'MDLZ', 'CSX', 'ADP', 'ISRG', 'GILD', 'BKNG', 'MAR', 'MNST', 'CTAS', 'AEP', 'KDP', 'XEL', 'PCAR', 'FAST', 'CDW', 'PAYX', 'ROST', 'IDXX', 'WBA', 'EXC', 'EA', 'BIDU', 'NTES', 'JD', 'PDD', 'BMRN', 'ALGN', 'SIRI', 'VRSK', 'CGEN', 'ILMN', 'SGEN', 'BIIB', 'INCY', 'TCOM', 'CHTR', 'DLTR', 'MELI', 'CPRT', 'CTSH', 'DXCM', 'FISV', 'LULU', 'ORLY', 'TTWO', 'WBD', 'ZS', 'CRWD', 'DDOG', 'DOCU', 'OKTA', 'SNOW', 'TEAM', 'VRSN', 'ANSS', 'ASML', 'CDNS', 'CERN', 'FTNT', 'MCHP', 'MPWR', 'PTC', 'SWKS', 'TER', 'TXN', 'XLNX', 'ZM'
-                # ... (add all Nasdaq-100 tickers here, truncated for brevity)
-            ]
-            # Combine and remove duplicates
+            from app.utils.ticker_loader import load_or_scrape_tickers
+            self.sp500_symbols, self.nasdaq_symbols = load_or_scrape_tickers()
             self.all_symbols = list(set(self.sp500_symbols + self.nasdaq_symbols))
-            print(f"Initialized with {len(self.all_symbols)} unique stocks (S&P 500 + Nasdaq-100)")
+            print(f"Loaded {len(self.sp500_symbols)} S&P 500 and {len(self.nasdaq_symbols)} Nasdaq-100 tickers.")
         except Exception as e:
             print(f"Error initializing stock lists: {e}")
-            # Fallback to basic list
             self.all_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
     
     def fetch_ohlcv(self, symbol: str, days: int = 400):
@@ -275,28 +264,22 @@ class SignalService:
                 
                 print(f"{symbol}: Close=${close:.2f}, Signal={'BUY' if signal_triggered else 'HOLD'}")
                 
-                # Create signal for all users
-                for user in db.query(User).all():
-                    # Calculate personalized position size based on distributed risk
-                    user_position_size = self.calculate_position_size(
-                        close, stop_loss, user.risk_tolerance, user.capital,
-                        user.id, db, symbol
-                    )
-                    
-                    signal = Signal(
-                        user_id=user.id,
-                        symbol=symbol,
-                        date=today,
-                        close=close,
-                        high_20d=high_20d or 0,
-                        sma_50d=sma_50d or 0,
-                        sma_200d=sma_200d or 0,
-                        high_52w=high_52w or 0,
-                        atr=atr or 0,
-                        signal_triggered=int(signal_triggered)
-                    )
-                    signals.append(signal)
-                    db.add(signal)
+                # Create ONE signal per stock (not per user)
+                # We'll use user_id=0 to indicate this is a market-wide signal
+                signal = Signal(
+                    user_id=0,  # 0 indicates market-wide signal
+                    symbol=symbol,
+                    date=today,
+                    close=close,
+                    high_20d=high_20d or 0,
+                    sma_50d=sma_50d or 0,
+                    sma_200d=sma_200d or 0,
+                    high_52w=high_52w or 0,
+                    atr=atr or 0,
+                    signal_triggered=int(signal_triggered)
+                )
+                signals.append(signal)
+                db.add(signal)
                 
                 successful_analysis += 1
                 
@@ -307,16 +290,16 @@ class SignalService:
         db.commit()
         self.update_last_run(db)
         print(f"Completed daily analysis: {successful_analysis}/{len(self.all_symbols)} stocks analyzed")
-        print(f"Generated {len(signals)} signals for all users")
+        print(f"Generated {len(signals)} market signals")
         return signals
 
     def get_user_signals_from_analysis(self, db: Session, user: User):
         """Get signals for a specific user from the latest market analysis"""
         today = datetime.now(timezone.utc).date()
         
-        # Check if we have analysis for today
+        # Check if we have analysis for today (market-wide signals with user_id=0)
         signals = db.query(Signal).filter(
-            Signal.user_id == user.id,
+            Signal.user_id == 0,  # Market-wide signals
             Signal.date == today
         ).order_by(Signal.signal_triggered.desc(), Signal.symbol).all()
         
@@ -325,11 +308,20 @@ class SignalService:
             print("No daily analysis found, generating now...")
             self.generate_daily_market_analysis(db)
             signals = db.query(Signal).filter(
-                Signal.user_id == user.id,
+                Signal.user_id == 0,  # Market-wide signals
                 Signal.date == today
             ).order_by(Signal.signal_triggered.desc(), Signal.symbol).all()
         
         return signals
+
+    def get_unique_stocks_count(self, db: Session):
+        """Get the count of unique stocks analyzed today"""
+        today = datetime.now(timezone.utc).date()
+        unique_stocks = db.query(Signal.symbol).filter(
+            Signal.user_id == 0,  # Market-wide signals
+            Signal.date == today
+        ).distinct().count()
+        return unique_stocks
 
     def generate_signals_for_user(self, db: Session, user: User):
         """Get signals for user from daily market analysis"""

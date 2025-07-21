@@ -41,10 +41,10 @@ def get_signals(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all signals for the current user, most recent first."""
+    """Get all market-wide signals, most recent first."""
     try:
         signals = db.query(Signal).filter(
-            Signal.user_id == current_user.id
+            Signal.user_id == 0  # Market-wide signals
         ).order_by(Signal.date.desc(), Signal.symbol).all()
         return signals
     except Exception as e:
@@ -67,7 +67,7 @@ def get_buy_signals(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get only BUY signals for the current user from today's analysis."""
+    """Get only BUY signals from today's market analysis."""
     try:
         signals = signal_service.get_user_signals_from_analysis(db, current_user)
         # Filter for only BUY signals (signal_triggered = 1)
@@ -75,6 +75,18 @@ def get_buy_signals(
         return buy_signals
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch buy signals: {str(e)}")
+
+@router.get("/unique-stocks-count")
+def get_unique_stocks_count(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get the count of unique stocks analyzed today."""
+    try:
+        count = signal_service.get_unique_stocks_count(db)
+        return {"unique_stocks_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get unique stocks count: {str(e)}")
 
 @router.post("/admin/force-analyze")
 def admin_force_analyze(

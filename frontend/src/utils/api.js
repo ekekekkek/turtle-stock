@@ -136,6 +136,7 @@ export const signalsAPI = {
   getTodaySignals: () => api.get('/api/signals/today'),
   generateSignals: () => api.post('/api/signals/generate'),
   getSignalsStatus: () => api.get('/api/signals/status'),
+  getUniqueStocksCount: () => api.get('/api/signals/unique-stocks-count'),
 };
 
 export default api; 

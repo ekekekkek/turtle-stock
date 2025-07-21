@@ -28,6 +28,7 @@ const Watchlist = () => {
   const [lastRun, setLastRun] = useState(null);
   const [signalsRequested, setSignalsRequested] = useState(false);
   const [showHold, setShowHold] = useState(false);
+  const [uniqueStocksCount, setUniqueStocksCount] = useState(0);
 
   useEffect(() => {
     fetchWatchlist();
@@ -73,14 +74,19 @@ const Watchlist = () => {
     setSignalsRequested(true);
     try {
       setSignalsLoading(true);
-      const res = await signalsAPI.getTodaySignals();
-      setSignals(res.data);
-      if (res.data.length > 0) {
-        toast.success(`${res.data.length} daily signals available!`);
+      const [signalsRes, countRes] = await Promise.all([
+        signalsAPI.getTodaySignals(),
+        signalsAPI.getUniqueStocksCount()
+      ]);
+      setSignals(signalsRes.data);
+      setUniqueStocksCount(countRes.data.unique_stocks_count);
+      if (signalsRes.data.length > 0) {
+        toast.success(`${countRes.data.unique_stocks_count} unique stocks analyzed!`);
       }
       fetchStatus();
     } catch (err) {
       setSignals([]);
+      setUniqueStocksCount(0);
       setError('Unable to get analysis.');
       console.error('Error fetching signals:', err);
       if (err.response?.status === 401) {
@@ -217,8 +223,8 @@ const Watchlist = () => {
           {signals.length > 0 ? (
             <div>
               <div className="mb-4 text-sm text-yellow-700">
-                <p>Analysis of {signals.length} stocks from S&P 500 and Nasdaq</p>
-                <p>Signals based on yesterday's market data</p>
+                <p>Analysis of {uniqueStocksCount} unique stocks from S&P 500 and Nasdaq</p>
+                <p>Signals based on {signals[0]?.date ? new Date(signals[0].date).toLocaleDateString() : 'yesterday'}'s market data</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">

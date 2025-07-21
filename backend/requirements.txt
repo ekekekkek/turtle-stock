@@ -19,3 +19,4 @@ websockets==15.0.1
 numpy
 APScheduler>=3.10.0
 yfinance==0.2.64 
+beautifulsoup4==4.12.3 
