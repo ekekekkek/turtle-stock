@@ -246,14 +246,14 @@ export default function Portfolio() {
             </button>
             <button
               onClick={() => { setSelectedHolding(h); setShowEditSellModal(true) }}
-              className="absolute top-2 right-10 p-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+              className="absolute top-2 right-9 p-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
               title="Edit / Sell"
             >
               <PencilIcon className="w-4 h-4" />
             </button>
             <button
               onClick={() => { setSelectedAddUpHolding(h); setShowAddUpModal(true) }}
-              className="absolute top-2 right-18 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+              className="absolute top-2 right-16 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
               title="Add-up"
             >
               <PlusIcon className="w-4 h-4" />
