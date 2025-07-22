@@ -261,6 +261,7 @@ export default function Portfolio() {
             <div>
               <h4 className="text-lg font-semibold">{h.symbol}</h4>
               <p className="text-sm text-gray-500">Shares: {h.shares}</p>
+              <p className="text-sm text-gray-500">Entry Date: {h.created_at ? new Date(h.created_at).toLocaleDateString() : '-'}</p>
             </div>
             <div className="mt-4 space-y-1">
               <p>Avg Price: ${h.average_price.toFixed(2)}</p>
