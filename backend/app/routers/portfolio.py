@@ -263,6 +263,13 @@ def get_portfolio_performance(
         # Calculate ATR for this symbol (default window=14)
         atr = stock_service.calculate_atr(h.symbol, 14)
 
+        # Get all buy/add-up transaction dates for this holding
+        buy_txns = db.query(PortfolioTransaction).filter(
+            PortfolioTransaction.portfolio_id == h.id,
+            PortfolioTransaction.transaction_type == "buy"
+        ).order_by(PortfolioTransaction.transaction_date.asc()).all()
+        purchase_dates = [txn.transaction_date.isoformat() for txn in buy_txns]
+
         summary["holdings"].append({
             "symbol":             h.symbol,
             "shares":             h.total_shares,
@@ -274,6 +281,7 @@ def get_portfolio_performance(
             "gain_loss_percent":  (gain / invested * 100) if invested else 0,
             "stop_loss_price":    h.stop_loss_price,
             "atr":                atr,
+            "purchase_dates":     purchase_dates,  # <-- new field
         })
         total_invested += invested
         total_current  += current
