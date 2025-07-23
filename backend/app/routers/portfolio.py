@@ -31,11 +31,15 @@ def _update_all_holdings_stop_loss(user_id: int, db: Session):
     # Update each holding's stop loss price
     for holding in holdings:
         if holding.symbol in distributed_risk:
-            stock_risk_amount = distributed_risk[holding.symbol]
-            if holding.total_shares > 0:
-                # Calculate new stop loss price based on distributed risk
-                new_stop_loss_price = holding.average_price - (stock_risk_amount / holding.total_shares)
+            # Fetch ATR for this symbol
+            atr = stock_service.calculate_atr(holding.symbol, 14)
+            if holding.total_shares > 0 and atr is not None:
+                # Calculate new stop loss price based on new average price and ATR
+                new_stop_loss_price = holding.average_price - (2 * atr)
                 holding.stop_loss_price = new_stop_loss_price
+                # Calculate and print/log new add-up point
+                new_add_up_point = holding.average_price + (0.5 * atr)
+                print(f"[TRAILING][PRINT] {holding.symbol} New Stop Loss: {new_stop_loss_price}, New Add-up Point: {new_add_up_point}")
     db.commit()
 
 @router.get("/", response_model=List[PortfolioWithTransactions])
@@ -545,7 +549,6 @@ def add_up_stock(
     )
     db.add(txn)
     db.flush()
-    #db.refresh(holding) -> Ensure latest state before aggregation
     # Recalculate aggregates
     all_txns = (
         db.query(PortfolioTransaction)
@@ -562,8 +565,17 @@ def add_up_stock(
     holding.total_shares  = total_shares
     holding.average_price = (total_cost / total_shares) if total_shares else 0
     holding.is_added_up = 1
-    # Set stop loss to 15% below the add-up price
-    holding.stop_loss_price = data.price * 0.90
+    # Fetch ATR for this symbol
+    atr = stock_service.calculate_atr(symbol, 14)
+    if atr is not None:
+        # Set stop loss to new formula: New Avg Price - (2 * ATR)
+        holding.stop_loss_price = holding.average_price - (2 * atr)
+        # Calculate and print/log new add-up point
+        new_add_up_point = holding.average_price + (0.5 * atr)
+        print(f"[ADDP][PRINT] {symbol.upper()} New Stop Loss: {holding.stop_loss_price}, New Add-up Point: {new_add_up_point}")
+    else:
+        holding.stop_loss_price = None
+        print(f"[ADDP][PRINT] {symbol.upper()} ATR not available, cannot calculate new stop loss or add-up point.")
     db.commit()
     db.refresh(holding)
     print(f"[ADDP][PRINT] AFTER UPDATE: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}, is_added_up={holding.is_added_up}, stop_loss_price={holding.stop_loss_price}")
