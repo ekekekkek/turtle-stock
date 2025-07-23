@@ -84,7 +84,7 @@ const AddUpModal = ({ isOpen, onClose, holding, onAddUp }) => {
               <div className="text-blue-900 font-semibold mb-2">Recommended Add-up</div>
               <div className="text-sm text-blue-700 mb-1">ATR: ${recommendation.atr.toFixed(2)}</div>
               <div className="text-sm text-blue-700 mb-1">Add-up Stop Distance: ${recommendation.stop_loss_distance.toFixed(2)}</div>
-              <div className="text-sm text-blue-700 mb-1">Recommended Shares: {Math.min(recommendation.recommended_shares, maxAddUpShares)}</div>
+              <div className="text-sm text-blue-700 mb-1">Recommended Shares: {Math.floor(Math.min(recommendation.recommended_shares, maxAddUpShares))}</div>
               <div className="text-sm text-blue-700 mb-1">Position Value: ${recommendation.position_value}</div>
               <div className="text-sm text-blue-700 mb-1">Risk Amount: ${recommendation.risk_amount}</div>
               <div className="text-sm text-blue-700 mb-1">Max Add-up Shares Allowed: {maxAddUpShares}</div>
