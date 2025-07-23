@@ -565,11 +565,19 @@ def add_up_stock(
     holding.total_shares  = total_shares
     holding.average_price = (total_cost / total_shares) if total_shares else 0
     holding.is_added_up = 1
+    # Fetch current price for trailing stop
+    current_quote = stock_service.get_stock_quote(symbol)
+    if not current_quote or "price" not in current_quote:
+        raise HTTPException(status_code=400, detail="Unable to fetch current price for trailing stop")
+
+    current_price = current_quote["price"]
+    
+    # Set stop loss = 5% below current price
+    holding.stop_loss_price = current_price * 0.95
+
     # Fetch ATR for this symbol
     atr = stock_service.calculate_atr(symbol, 14)
     if atr is not None:
-        # Set stop loss to new formula: New Avg Price - (2 * ATR)
-        holding.stop_loss_price = holding.average_price - (2 * atr)
         # Calculate and print/log new add-up point
         new_add_up_point = holding.average_price + (0.5 * atr)
         print(f"[ADDP][PRINT] {symbol.upper()} New Stop Loss: {holding.stop_loss_price}, New Add-up Point: {new_add_up_point}")
