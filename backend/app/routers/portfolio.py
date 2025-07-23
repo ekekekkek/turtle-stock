@@ -533,6 +533,7 @@ def add_up_stock(
             detail=f"Add-up shares ({data.shares}) must be less than current shares ({holding.total_shares}) for pyramid structure."
         )
     logger.info(f"[ADDP] BEFORE: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}")
+    print(f"[ADDP][PRINT] BEFORE UPDATE: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}, is_added_up={holding.is_added_up}, stop_loss_price={holding.stop_loss_price}")
     # Add transaction
     txn = PortfolioTransaction(
         portfolio_id=holding.id,
@@ -543,7 +544,8 @@ def add_up_stock(
         transaction_date=data.date
     )
     db.add(txn)
-    db.refresh(holding)  # Ensure latest state before aggregation
+    db.flush()
+    #db.refresh(holding) -> Ensure latest state before aggregation
     # Recalculate aggregates
     all_txns = (
         db.query(PortfolioTransaction)
@@ -564,6 +566,7 @@ def add_up_stock(
     holding.stop_loss_price = data.price * 0.90
     db.commit()
     db.refresh(holding)
+    print(f"[ADDP][PRINT] AFTER UPDATE: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}, is_added_up={holding.is_added_up}, stop_loss_price={holding.stop_loss_price}")
     logger.info(f"[ADDP] AFTER: symbol={symbol.upper()}, total_shares={holding.total_shares}, average_price={holding.average_price}")
     # Recalculate stop loss for all not-added-up holdings
     _update_all_holdings_stop_loss(current_user.id, db)
