@@ -294,7 +294,10 @@ class StockService:
             current_price = quote["price"]
             
             # Calculate distributed risk
-            distributed_risk = self.calculate_distributed_risk(user_id, db, symbol)
+            # Exclude added-up stocks from risk distribution
+            from app.models.portfolio import Portfolio
+            added_up_symbols = [h.symbol for h in db.query(Portfolio).filter(Portfolio.user_id == user_id, Portfolio.is_added_up == 1).all()]
+            distributed_risk = self.calculate_distributed_risk(user_id, db, symbol, exclude_symbols=added_up_symbols)
             if not distributed_risk or symbol.upper() not in distributed_risk:
                 return {"error": "Unable to calculate distributed risk"}
                 

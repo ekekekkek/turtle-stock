@@ -90,8 +90,11 @@ def add_stock_to_portfolio(
         # 3) Calculate stop loss price based on distributed risk across all stocks
         stop_loss_price = 0
         
-        # Calculate distributed risk across all stocks
-        distributed_risk = stock_service.calculate_distributed_risk(current_user.id, db, item.symbol.upper())
+        # Exclude added-up stocks from risk distribution
+        added_up_symbols = [h.symbol for h in db.query(Portfolio).filter(Portfolio.user_id == current_user.id, Portfolio.is_added_up == 1).all()]
+        
+        # Calculate distributed risk across all stocks, excluding added-up stocks
+        distributed_risk = stock_service.calculate_distributed_risk(current_user.id, db, item.symbol.upper(), exclude_symbols=added_up_symbols)
         if not distributed_risk or item.symbol.upper() not in distributed_risk:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -100,6 +103,9 @@ def add_stock_to_portfolio(
         
         # Get risk amount for this specific stock
         stock_risk_amount = distributed_risk[item.symbol.upper()]
+        
+        # Debugging: print stop loss calculation components
+        print(f"[DEBUG][STOP LOSS] symbol={item.symbol.upper()}, item.price={item.price}, stock_risk_amount={stock_risk_amount}, item.shares={item.shares}")
         
         # Calculate stop loss price based on distributed risk
         stop_loss_price = item.price - (stock_risk_amount / item.shares)
@@ -153,9 +159,6 @@ def add_stock_to_portfolio(
             db.add(txn)
 
         db.commit()
-        
-        # Update stop loss prices for all holdings based on new distributed risk
-        _update_all_holdings_stop_loss(current_user.id, db)
         
         db.refresh(holding)
         return holding
