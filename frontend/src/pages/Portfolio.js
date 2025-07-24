@@ -1,7 +1,7 @@
 // src/pages/Portfolio.js
 import React, { useState, useEffect } from 'react'
 import { portfolioAPI } from '../utils/api'
-import { BriefcaseIcon, PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline'
+import { BriefcaseIcon, PlusIcon, TrashIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 import AddStockModal from '../components/AddStockModal'
 import { Dialog } from '@headlessui/react'
@@ -30,6 +30,10 @@ export default function Portfolio() {
   const [selectedHolding, setSelectedHolding] = useState(null)
   const [showAddUpModal, setShowAddUpModal] = useState(false)
   const [selectedAddUpHolding, setSelectedAddUpHolding] = useState(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [selectedDetailHolding, setSelectedDetailHolding] = useState(null)
+  const [showEditSellMenu, setShowEditSellMenu] = useState(false)
+  const [editSellMenuAnchor, setEditSellMenuAnchor] = useState(null)
 
   const loadPerformance = async () => {
     try {
@@ -237,20 +241,23 @@ export default function Portfolio() {
             key={h.symbol}
             className="bg-white rounded-lg shadow p-6 flex flex-col justify-between relative"
           >
+            {/* Scope icon for details */}
             <button
-              onClick={() => handleRemoveStock(h.symbol)}
-              className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-              title="Remove from portfolio"
+              onClick={() => { setSelectedDetailHolding(h); setShowDetailModal(true) }}
+              className="absolute top-2 right-2 p-1 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+              title="View Details"
             >
-              <TrashIcon className="w-4 h-4" />
+              <MagnifyingGlassIcon className="w-4 h-4" />
             </button>
+            {/* Pencil icon for edit/sell/delete menu */}
             <button
-              onClick={() => { setSelectedHolding(h); setShowEditSellModal(true) }}
+              onClick={e => { setSelectedHolding(h); setEditSellMenuAnchor(e.currentTarget); setShowEditSellMenu(true) }}
               className="absolute top-2 right-9 p-1 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
-              title="Edit / Sell"
+              title="Edit / Sell / Delete"
             >
               <PencilIcon className="w-4 h-4" />
             </button>
+            {/* Add-up icon remains */}
             <button
               onClick={() => { setSelectedAddUpHolding(h); setShowAddUpModal(true) }}
               className="absolute top-2 right-16 p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
@@ -285,6 +292,77 @@ export default function Portfolio() {
           </div>
         ))}
       </div>
+
+      {/* Edit/Sell/Delete Menu Modal */}
+      {showEditSellMenu && selectedHolding && (
+        <Dialog open={showEditSellMenu} onClose={() => setShowEditSellMenu(false)}>
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+            <Dialog.Panel className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs">
+              <Dialog.Title className="text-lg font-bold mb-4">Actions for {selectedHolding.symbol}</Dialog.Title>
+              <div className="space-y-4">
+                <button
+                  className="w-full px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+                  onClick={() => { setShowEditSellModal(true); setShowEditSellMenu(false); }}
+                >
+                  Sell Stock
+                </button>
+                <button
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={async () => { await handleRemoveStock(selectedHolding.symbol); setShowEditSellMenu(false); }}
+                >
+                  Delete Stock
+                </button>
+                <button
+                  className="w-full px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  onClick={() => setShowEditSellMenu(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </Dialog.Panel>
+          </div>
+        </Dialog>
+      )}
+      {/* Detail Modal for Scope Icon */}
+      {showDetailModal && selectedDetailHolding && (
+        <Dialog open={showDetailModal} onClose={() => setShowDetailModal(false)}>
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+            <Dialog.Panel className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+              <Dialog.Title className="text-lg font-bold mb-4">Details for {selectedDetailHolding.symbol}</Dialog.Title>
+              <div className="space-y-2">
+                <p><strong>Company:</strong> {selectedDetailHolding.company_name}</p>
+                <p><strong>Shares:</strong> {selectedDetailHolding.shares}</p>
+                <p><strong>Average Price:</strong> ${selectedDetailHolding.average_price.toFixed(2)}</p>
+                <p><strong>Current Price:</strong> ${selectedDetailHolding.current_price.toFixed(2)}</p>
+                <p><strong>Stop Loss:</strong> ${selectedDetailHolding.stop_loss_price?.toFixed(2) ?? '-'}</p>
+                <p><strong>Add-up Point:</strong> {selectedDetailHolding.atr != null ? `$${(selectedDetailHolding.average_price + selectedDetailHolding.atr).toFixed(2)}` : '-'}</p>
+                <p><strong>Entry Date:</strong> {Array.isArray(selectedDetailHolding.purchase_dates) && selectedDetailHolding.purchase_dates.length > 0 ? new Date(selectedDetailHolding.purchase_dates[0]).toLocaleDateString() : '-'}</p>
+                {Array.isArray(selectedDetailHolding.purchase_dates) && selectedDetailHolding.purchase_dates.length > 1 && (
+                  <p><strong>Add-up Dates:</strong> {selectedDetailHolding.purchase_dates.slice(1).map(d => new Date(d).toLocaleDateString()).join(', ')}</p>
+                )}
+                {/* Price Log */}
+                <div className="mt-4">
+                  <h4 className="font-semibold mb-2">Price Log</h4>
+                  {Array.isArray(selectedDetailHolding.purchase_dates) && selectedDetailHolding.purchase_dates.length > 0 ? (
+                    <ul className="text-sm space-y-1">
+                      {selectedDetailHolding.purchase_dates.map((date, idx) => (
+                        <li key={idx}>
+                          {new Date(date).toLocaleDateString()} - ${selectedDetailHolding.average_price.toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500">No price log available.</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end mt-6">
+                <button onClick={() => setShowDetailModal(false)} className="px-4 py-2 bg-gray-200 rounded">Close</button>
+              </div>
+            </Dialog.Panel>
+          </div>
+        </Dialog>
+      )}
 
       {/* Edit/Sell Modal */}
       <EditSellStockModal
