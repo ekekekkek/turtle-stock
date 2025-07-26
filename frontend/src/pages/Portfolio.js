@@ -254,7 +254,7 @@ export default function Portfolio() {
             </button>
             {/* Pencil icon for edit/sell/delete menu */}
             <button
-              onClick={e => { setSelectedHolding(h); setEditSellMenuAnchor(e.currentTarget); setShowEditSellMenu(true) }}
+              onClick={() => { setSelectedHolding(h); setShowEditSellModal(true) }}
               className="absolute top-2 right-9 p-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               title="Edit / Sell / Delete"
             >
