@@ -167,9 +167,9 @@ const Watchlist = () => {
             <EyeIcon className="w-8 h-8 mr-3 text-gray-900 dark:text-white" />
             Watchlist
           </h1>
-          <p className="mt-2 text-gray-600 dark:text-white">Track your favorite stocks and daily market signals</p>
+          {/* <p className="mt-2 text-gray-600 dark:text-gray">Track your favorite stocks and daily market signals</p> */}
           {lastRun && (
-            <div className="mt-2 text-xs text-gray-500 dark:text-white">
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray">
               Last market analysis: {new Date(lastRun).toLocaleString()} (based on previous market close)
             </div>
           )}
