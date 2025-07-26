@@ -110,15 +110,15 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-[500px] shadow-lg rounded-md bg-white">
+      <div className="relative top-20 mx-auto p-5 border w-[500px] shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <div className="mt-3">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               {step === 1 ? 'Add Stock to Portfolio' : 'Position Size Recommendation'}
             </h3>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             >
               <XMarkIcon className="w-6 h-6" />
             </button>
@@ -127,15 +127,15 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
           {/* Step Indicator */}
           <div className="flex items-center justify-center mb-6">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              step >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
+              step >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
             }`}>
               1
             </div>
             <div className={`w-12 h-1 mx-2 ${
-              step >= 2 ? 'bg-primary-600' : 'bg-gray-200'
+              step >= 2 ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-600'
             }`}></div>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              step >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-600'
+              step >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
             }`}>
               2
             </div>
@@ -145,7 +145,7 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
             <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stock Symbol *
                   </label>
                   <input
@@ -155,13 +155,13 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                     value={formData.symbol}
                     onChange={handleChange}
                     placeholder="e.g., AAPL"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Price per Share *
                   </label>
                   <input
@@ -173,13 +173,13 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                     placeholder="e.g., 150.00"
                     step="0.01"
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Purchase Date
                   </label>
                   <input
@@ -188,7 +188,7 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                     name="date"
                     value={formData.date}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -274,7 +274,7 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                     </div>
 
                     <div>
-                      <label htmlFor="shares" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="shares" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Number of Shares *
                       </label>
                       <input
@@ -286,7 +286,7 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                         placeholder={positionSizeData.recommended_shares.toFixed(2)}
                         step="0.01"
                         min="0"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         required
                       />
                       <p className="text-xs text-gray-500 mt-1">

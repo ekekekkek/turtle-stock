@@ -54,18 +54,18 @@ const StockCard = ({ stock }) => {
   return (
     <Link
       to={`/stock/${symbol}`}
-      className="block bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-200"
+      className="block bg-white dark:bg-gray-950 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-200 dark:border-gray-700"
     >
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{symbol}</h3>
-          <p className="text-sm text-gray-600 truncate max-w-48">{displayName}</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{symbol}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-48">{displayName}</p>
         </div>
         <div className="text-right">
-          <p className="text-xl font-bold text-gray-900">{formattedPrice}</p>
+          <p className="text-xl font-bold text-gray-900 dark:text-white">{formattedPrice}</p>
           <div
             className={`flex items-center text-sm font-medium ${
-              isPositive ? 'text-success-600' : 'text-danger-600'
+              isPositive ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'
             }`}
           >
             {isPositive ? (
@@ -80,23 +80,23 @@ const StockCard = ({ stock }) => {
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-gray-500">Volume</p>
-          <p className="font-medium text-gray-900">{formattedVolume}</p>
+          <p className="text-gray-500 dark:text-gray-400">Volume</p>
+          <p className="font-medium text-gray-900 dark:text-white">{formattedVolume}</p>
         </div>
         <div>
-          <p className="text-gray-500">Market Cap</p>
-          <p className="font-medium text-gray-900">{formattedMarketCap}</p>
+          <p className="text-gray-500 dark:text-gray-400">Market Cap</p>
+          <p className="font-medium text-gray-900 dark:text-white">{formattedMarketCap}</p>
         </div>
         {sma200 !== undefined && (
           <div>
-            <p className="text-gray-500">200d SMA</p>
-            <p className="font-medium text-gray-900">{sma200 ? `$${sma200.toFixed(2)}` : 'N/A'}</p>
+            <p className="text-gray-500 dark:text-gray-400">200d SMA</p>
+            <p className="font-medium text-gray-900 dark:text-white">{sma200 ? `$${sma200.toFixed(2)}` : 'N/A'}</p>
           </div>
         )}
         {high52w !== undefined && (
           <div>
-            <p className="text-gray-500">52w High</p>
-            <p className="font-medium text-gray-900">{high52w ? `$${high52w.toFixed(2)}` : 'N/A'}</p>
+            <p className="text-gray-500 dark:text-gray-400">52w High</p>
+            <p className="font-medium text-gray-900 dark:text-white">{high52w ? `$${high52w.toFixed(2)}` : 'N/A'}</p>
           </div>
         )}
       </div>

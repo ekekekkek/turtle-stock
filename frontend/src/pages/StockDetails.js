@@ -199,33 +199,33 @@ const StockDetails = () => {
 
       {/* Stock Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Current Price</h3>
-          <p className="text-3xl font-bold text-gray-900">${stock.price?.toFixed(2) || 'N/A'}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Current Price</h3>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">${stock.price?.toFixed(2) || 'N/A'}</p>
           {stock.change !== undefined && stock.changePercent !== undefined && (
-            <p className={`text-lg font-medium ${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-lg font-medium ${stock.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
               {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
             </p>
           )}
         </div>
         
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Market Cap</h3>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Market Cap</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {stock.market_cap ? `$${(stock.market_cap / 1e9).toFixed(2)}B` : 'N/A'}
           </p>
         </div>
         
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Volume</h3>
-          <p className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Volume</h3>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {stock.volume ? stock.volume.toLocaleString() : 'N/A'}
           </p>
         </div>
         
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">52W Range</h3>
-          <p className="text-lg font-medium text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">52W Range</h3>
+          <p className="text-lg font-medium text-gray-900 dark:text-white">
             {stock.fifty_two_week_low && stock.fifty_two_week_high 
               ? `$${stock.fifty_two_week_low.toFixed(2)} - $${stock.fifty_two_week_high.toFixed(2)}`
               : 'N/A'
@@ -235,9 +235,9 @@ const StockDetails = () => {
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Price Chart</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Price Chart</h2>
           <div className="flex space-x-2">
             {timeRanges.map((range) => (
               <button
@@ -245,8 +245,8 @@ const StockDetails = () => {
                 onClick={() => handleTimeRangeChange(range.value)}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                   timeRange === range.value
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {range.label}
@@ -259,32 +259,32 @@ const StockDetails = () => {
 
       {/* Additional Info */}
       {stock.description && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">About {stock.name}</h3>
-          <p className="text-gray-700 leading-relaxed">{stock.description}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">About {stock.name}</h3>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{stock.description}</p>
         </div>
       )}
 
       {/* Key Statistics */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Statistics</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Key Statistics</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {stock.pe_ratio && (
             <div>
-              <p className="text-sm text-gray-600">P/E Ratio</p>
-              <p className="text-lg font-semibold text-gray-900">{stock.pe_ratio.toFixed(2)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">P/E Ratio</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{stock.pe_ratio.toFixed(2)}</p>
             </div>
           )}
           {stock.dividend_yield && (
             <div>
-              <p className="text-sm text-gray-600">Dividend Yield</p>
-              <p className="text-lg font-semibold text-gray-900">{(stock.dividend_yield * 100).toFixed(2)}%</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Dividend Yield</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{(stock.dividend_yield * 100).toFixed(2)}%</p>
             </div>
           )}
           {stock.beta && (
             <div>
-              <p className="text-sm text-gray-600">Beta</p>
-              <p className="text-lg font-semibold text-gray-900">{stock.beta.toFixed(2)}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Beta</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{stock.beta.toFixed(2)}</p>
             </div>
           )}
         </div>

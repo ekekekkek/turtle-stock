@@ -20,12 +20,12 @@ const MarketOverview = ({ data }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {data.indices?.map((index) => (
           <div key={index.symbol} className="text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{index.name}</h3>
-            <p className="text-2xl font-bold text-gray-900 mb-1">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{index.name}</h3>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
               {index.price ? index.price.toFixed(2) : 'N/A'}
             </p>
             {index.change !== undefined && index.changePercent !== undefined && (

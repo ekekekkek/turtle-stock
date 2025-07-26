@@ -163,13 +163,13 @@ const Watchlist = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <EyeIcon className="w-8 h-8 mr-3" />
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+            <EyeIcon className="w-8 h-8 mr-3 text-gray-900 dark:text-white" />
             Watchlist
           </h1>
-          <p className="mt-2 text-gray-600">Track your favorite stocks and daily market signals</p>
+          <p className="mt-2 text-gray-600 dark:text-white">Track your favorite stocks and daily market signals</p>
           {lastRun && (
-            <div className="mt-2 text-xs text-gray-500">
+            <div className="mt-2 text-xs text-gray-500 dark:text-white">
               Last market analysis: {new Date(lastRun).toLocaleString()} (based on previous market close)
             </div>
           )}
@@ -178,14 +178,14 @@ const Watchlist = () => {
           <button
             onClick={handleGetSignals}
             disabled={signalsLoading || !isAuthenticated}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
           >
             <SparklesIcon className="w-5 h-5 mr-2" />
             {signalsLoading ? 'Loading...' : 'Get Daily Signals'}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
           >
             <PlusIcon className="w-5 h-5 mr-2" />
             Add Stock
@@ -195,23 +195,23 @@ const Watchlist = () => {
 
       {/* Daily Signals Section */}
       {isAuthenticated && (
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6">
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6 dark:from-gray-950 dark:to-gray-950 dark:bg-gray-950 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
-              <SparklesIcon className="w-6 h-6 text-yellow-600 mr-2" />
-              <h2 className="text-xl font-semibold text-yellow-800">Daily Market Analysis</h2>
+              <SparklesIcon className="w-6 h-6 text-yellow-600 mr-2 dark:text-yellow-400" />
+              <h2 className="text-xl font-semibold text-yellow-800 dark:text-white">Daily Market Analysis</h2>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleGetSignals}
                 disabled={signalsLoading}
-                className="text-sm text-yellow-700 hover:text-yellow-800 underline"
+                className="text-sm text-yellow-700 hover:text-yellow-800 underline dark:text-white dark:hover:text-gray-300"
               >
                 {signalsLoading ? 'Loading...' : 'Refresh'}
               </button>
               <button
                 onClick={() => setShowHold((prev) => !prev)}
-                className="text-sm text-yellow-700 hover:text-yellow-800 underline flex items-center"
+                className="text-sm text-yellow-700 hover:text-yellow-800 underline flex items-center dark:text-white dark:hover:text-gray-300"
                 aria-expanded={showHold}
               >
                 {showHold ? <ChevronUpIcon className="w-4 h-4 mr-1" /> : <ChevronDownIcon className="w-4 h-4 mr-1" />}
@@ -222,28 +222,28 @@ const Watchlist = () => {
           
           {signals.length > 0 ? (
             <div>
-              <div className="mb-4 text-sm text-yellow-700">
+              <div className="mb-4 text-sm text-yellow-700 dark:text-white">
                 <p>Analysis of {uniqueStocksCount} unique stocks from S&P 500 and Nasdaq</p>
                 <p>Signals based on {signals[0]?.date ? new Date(signals[0].date).toLocaleDateString() : 'yesterday'}'s market data</p>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm dark:bg-gray-950">
                   <thead>
-                    <tr className="bg-yellow-100">
-                      <th className="px-3 py-2 text-left">Symbol</th>
-                      <th className="px-3 py-2 text-right">Close</th>
-                      <th className="px-3 py-2 text-right">20d High</th>
-                      <th className="px-3 py-2 text-right">50d SMA</th>
-                      <th className="px-3 py-2 text-right">200d SMA</th>
-                      <th className="px-3 py-2 text-right">52w High</th>
-                      <th className="px-3 py-2 text-right">ATR</th>
-                      <th className="px-3 py-2 text-center">Signal</th>
+                    <tr className="bg-yellow-100 dark:bg-gray-950">
+                      <th className="px-3 py-2 text-left text-yellow-800 dark:text-white">Symbol</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">Close</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">20d High</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">50d SMA</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">200d SMA</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">52w High</th>
+                      <th className="px-3 py-2 text-right text-yellow-800 dark:text-white">ATR</th>
+                      <th className="px-3 py-2 text-center text-yellow-800 dark:text-white">Signal</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="dark:bg-gray-950">
                     {(showHold ? signals : signals.filter(sig => sig.signal_triggered)).map(sig => (
-                      <tr key={sig.id} className="border-b border-yellow-200 hover:bg-yellow-50">
-                        <td className="px-3 py-2 font-bold text-blue-600">{sig.symbol}</td>
+                      <tr key={sig.id} className="border-b border-yellow-200 hover:bg-yellow-50 dark:border-gray-700 dark:hover:bg-gray-900 dark:text-gray-200 dark:bg-gray-950">
+                        <td className="px-3 py-2 font-bold text-blue-600 dark:text-blue-400">{sig.symbol}</td>
                         <td className="px-3 py-2 text-right">${sig.close?.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right">${sig.high_20d?.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right">${sig.sma_50d?.toFixed(2)}</td>
@@ -252,11 +252,11 @@ const Watchlist = () => {
                         <td className="px-3 py-2 text-right">{sig.atr?.toFixed(2)}</td>
                         <td className="px-3 py-2 text-center">
                           {sig.signal_triggered ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                               BUY
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                               HOLD
                             </span>
                           )}
@@ -270,20 +270,20 @@ const Watchlist = () => {
           ) : signalsRequested ? (
             <div className="text-center py-8">
               <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <p className="text-yellow-700 mb-4">No good stocks today.</p>
-              <p className="text-sm text-yellow-600">Analysis ran, but no stocks met the criteria.</p>
+              <p className="text-yellow-700 dark:text-yellow-300 mb-4">No good stocks today.</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">Analysis ran, but no stocks met the criteria.</p>
             </div>
           ) : error ? (
             <div className="text-center py-8">
               <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <p className="text-yellow-700 mb-4">Unable to get analysis.</p>
-              <p className="text-sm text-yellow-600">Please try again later.</p>
+              <p className="text-yellow-700 dark:text-yellow-300 mb-4">Unable to get analysis.</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">Please try again later.</p>
             </div>
           ) : (
             <div className="text-center py-8">
               <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <p className="text-yellow-700 mb-4">No market analysis available</p>
-              <p className="text-sm text-yellow-600">Click "Get Daily Signals" to analyze S&P 500 and Nasdaq stocks</p>
+              <p className="text-yellow-700 dark:text-yellow-300 mb-4">No market analysis available</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">Click "Get Daily Signals" to analyze S&P 500 and Nasdaq stocks</p>
             </div>
           )}
         </div>
@@ -311,18 +311,18 @@ const Watchlist = () => {
       )}
 
       {/* Watchlist Section */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-950 rounded-lg shadow border border-transparent dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Your Watchlist</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Your Watchlist</h2>
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
               <input
                 type="text"
                 placeholder="Search watchlist..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
           </div>
@@ -342,8 +342,8 @@ const Watchlist = () => {
             </div>
           ) : (
             <div className="text-center py-8">
-              <EyeIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">Your watchlist is empty</p>
+              <EyeIcon className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400 mb-4">Your watchlist is empty</p>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"

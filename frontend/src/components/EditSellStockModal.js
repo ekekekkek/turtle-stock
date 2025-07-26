@@ -44,11 +44,11 @@ export default function EditSellStockModal({ isOpen, onClose, holding, onSold })
   return (
     <Dialog open={isOpen} onClose={onClose}>
       <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
-        <Dialog.Panel className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-          <Dialog.Title className="text-lg font-bold mb-4">Edit / Sell {holding.symbol}</Dialog.Title>
+        <Dialog.Panel className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
+          <Dialog.Title className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Edit / Sell {holding.symbol}</Dialog.Title>
           <div className="mb-4">
             <button
-              className={`px-4 py-2 rounded-l ${tab === 'sell' ? 'bg-primary-600 text-white' : 'bg-gray-100'}`}
+              className={`px-4 py-2 rounded-l ${tab === 'sell' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'}`}
               onClick={() => setTab('sell')}
             >
               Sell
@@ -58,11 +58,11 @@ export default function EditSellStockModal({ isOpen, onClose, holding, onSold })
           {tab === 'sell' && (
             <form onSubmit={handleSell} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Symbol</label>
-                <input type="text" value={holding.symbol} disabled className="w-full border px-3 py-2 rounded bg-gray-100" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Symbol</label>
+                <input type="text" value={holding.symbol} disabled className="w-full border border-gray-300 dark:border-gray-600 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Shares to Sell</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shares to Sell</label>
                 <input
                   type="number"
                   min={0.01}
@@ -70,10 +70,10 @@ export default function EditSellStockModal({ isOpen, onClose, holding, onSold })
                   step={0.01}
                   value={sellData.shares}
                   onChange={e => setSellData(s => ({ ...s, shares: e.target.value }))}
-                  className="w-full border px-3 py-2 rounded"
+                  className="w-full border border-gray-300 dark:border-gray-600 px-3 py-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   required
                 />
-                <span className="text-xs text-gray-400">You own {holding.shares} shares</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">You own {holding.shares} shares</span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sell Price per Share ($)</label>
