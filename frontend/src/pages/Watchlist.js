@@ -360,11 +360,11 @@ const Watchlist = () => {
       {/* Add Stock Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4">Add Stock to Watchlist</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">Add Stock to Watchlist</h3>
             <form onSubmit={handleAddStock}>
               <div className="mb-4">
-                <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Stock Symbol
                 </label>
                 <input
@@ -373,7 +373,7 @@ const Watchlist = () => {
                   value={newStockSymbol}
                   onChange={(e) => setNewStockSymbol(e.target.value.toUpperCase())}
                   placeholder="e.g., AAPL"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   required
                 />
               </div>
@@ -381,7 +381,7 @@ const Watchlist = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>

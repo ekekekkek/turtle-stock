@@ -71,31 +71,31 @@ const AddUpModal = ({ isOpen, onClose, holding, onAddUp }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-[500px] shadow-lg rounded-md bg-white">
+      <div className="relative top-20 mx-auto p-5 border w-[500px] shadow-lg rounded-md bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
         <div className="mt-3">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Add-up to {holding.symbol}</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Add-up to {holding.symbol}</h3>
+            <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
               <XMarkIcon className="w-6 h-6" />
             </button>
           </div>
           {recommendation && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="text-blue-900 font-semibold mb-2">Recommended Add-up</div>
-              <div className="text-sm text-blue-700 mb-1">ATR: ${recommendation.atr.toFixed(2)}</div>
-              <div className="text-sm text-blue-700 mb-1">Add-up Stop Distance: ${recommendation.stop_loss_distance.toFixed(2)}</div>
-              <div className="text-sm text-blue-700 mb-1">Recommended Shares: {Math.floor(Math.min(recommendation.recommended_shares, maxAddUpShares))}</div>
-              <div className="text-sm text-blue-700 mb-1">Position Value: ${recommendation.position_value}</div>
-              <div className="text-sm text-blue-700 mb-1">Risk Amount: ${recommendation.risk_amount}</div>
-              <div className="text-sm text-blue-700 mb-1">Max Add-up Shares Allowed: {maxAddUpShares}</div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4">
+              <div className="text-blue-900 dark:text-blue-300 font-semibold mb-2">Recommended Add-up</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">ATR: ${recommendation.atr.toFixed(2)}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">Add-up Stop Distance: ${recommendation.stop_loss_distance.toFixed(2)}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">Recommended Shares: {Math.floor(Math.min(recommendation.recommended_shares, maxAddUpShares))}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">Position Value: ${recommendation.position_value}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">Risk Amount: ${recommendation.risk_amount}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-1">Max Add-up Shares Allowed: {maxAddUpShares}</div>
             </div>
           )}
           {pyramidError && (
-            <div className="text-red-600 text-sm mb-2">Add-up shares must be less than current shares ({holding.shares}) for pyramid structure.</div>
+            <div className="text-red-600 dark:text-red-400 text-sm mb-2">Add-up shares must be less than current shares ({holding.shares}) for pyramid structure.</div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Shares to Add *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Shares to Add *</label>
               <input
                 type="number"
                 value={shares}
@@ -103,36 +103,36 @@ const AddUpModal = ({ isOpen, onClose, holding, onAddUp }) => {
                 min={0}
                 max={maxAddUpShares}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price per Share *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price per Share *</label>
               <input
                 type="number"
                 value={price}
                 onChange={e => setPrice(e.target.value)}
                 min={0}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
               >
                 Cancel
               </button>
