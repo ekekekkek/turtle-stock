@@ -5,7 +5,7 @@ import { BriefcaseIcon, PlusIcon, TrashIcon, PencilIcon, MagnifyingGlassIcon } f
 import toast from 'react-hot-toast'
 import AddStockModal from '../components/AddStockModal'
 import { Dialog } from '@headlessui/react'
-import { BarChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, CartesianGrid } from 'recharts'
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import EditSellStockModal from '../components/EditSellStockModal'
 import AddUpModal from '../components/AddUpModal'
 
@@ -100,15 +100,18 @@ export default function Portfolio() {
 
   // Prepare trade history chart data
   const chartData = React.useMemo(() => {
+    // First, reverse the trade history to get chronological order (oldest first)
+    const chronologicalTrades = [...tradeHistory].reverse()
     let cumulative = 0
-    return tradeHistory.map((t, i) => {
+    
+    return chronologicalTrades.map((t, i) => {
       cumulative += t.net_value
       return {
-        name: `${t.symbol} #${tradeHistory.length - i}`,
+        name: `${t.symbol} #${i + 1}`,
         net: t.net_value,
         cumulative: cumulative,
       }
-    }).reverse()
+    })
   }, [tradeHistory])
 
   if (loading) {
@@ -394,7 +397,7 @@ export default function Portfolio() {
           <p className="text-gray-500 dark:text-gray-400">No trades yet.</p>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" className="dark:stroke-gray-600" />
               <XAxis dataKey="name" stroke="#9ca3af" className="dark:stroke-gray-400" fontSize={12} />
               <YAxis stroke="#9ca3af" className="dark:stroke-gray-400" fontSize={12} />
@@ -407,13 +410,24 @@ export default function Portfolio() {
                   color: '#f9fafb',
                 }}
               />
+              <Legend />
               <Bar
                 dataKey="net"
                 fill="#3b82f6"
                 className="dark:fill-gray-500"
                 radius={[4, 4, 0, 0]}
+                name="Trade Net"
               />
-            </BarChart>
+              <Line
+                type="monotone"
+                dataKey="cumulative"
+                stroke="#22c55e"
+                strokeWidth={3}
+                dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                activeDot={{ r: 6 }}
+                name="Cumulative Net"
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
