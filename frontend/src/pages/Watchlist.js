@@ -223,7 +223,7 @@ const Watchlist = () => {
           {signals.length > 0 ? (
             <div>
               <div className="mb-4 text-sm text-yellow-700 dark:text-white">
-                <p>Analysis of {uniqueStocksCount} unique stocks from S&P 500 and Nasdaq</p>
+                <p>Analysis of {uniqueStocksCount} unique stocks from S&P 500 and Nasdaq 100</p>
                 <p>Signals based on {signals[0]?.date ? new Date(signals[0].date).toLocaleDateString() : 'yesterday'}'s market data</p>
               </div>
               <div className="overflow-x-auto">
