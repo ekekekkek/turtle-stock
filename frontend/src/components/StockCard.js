@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 
-const StockCard = ({ stock }) => {
+const StockCard = ({ stock, showRemoveButton = false, onRemove, unclickable = false }) => {
   const {
     symbol,
     name,
@@ -51,12 +52,14 @@ const StockCard = ({ stock }) => {
   const sma200 = stock.sma_200d;
   const high52w = stock.high_52w;
 
+  const CardWrapper = unclickable ? 'div' : Link;
+  const cardProps = unclickable ? {} : { to: `/stock/${symbol}` };
   return (
-    <Link
-      to={`/stock/${symbol}`}
-      className="block bg-white dark:bg-gray-950 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-200 dark:border-gray-700"
+    <CardWrapper
+      {...cardProps}
+      className="block bg-white dark:bg-gray-950 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6 border border-gray-200 dark:border-gray-700 relative"
     >
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-4 pt-2">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{symbol}</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-48">{displayName}</p>
@@ -76,6 +79,16 @@ const StockCard = ({ stock }) => {
             {formattedChange} ({cp.toFixed(2)}%)
           </div>
         </div>
+        {showRemoveButton && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-2 right-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 bg-transparent rounded-full p-1 focus:outline-none"
+            aria-label="Remove from watchlist"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -100,7 +113,7 @@ const StockCard = ({ stock }) => {
           </div>
         )}
       </div>
-    </Link>
+    </CardWrapper>
   );
 };
 

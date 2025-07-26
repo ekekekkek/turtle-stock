@@ -337,6 +337,7 @@ const Watchlist = () => {
                   stock={stock}
                   onRemove={() => handleRemoveStock(stock.symbol)}
                   showRemoveButton={true}
+                  unclickable={true}
                 />
               ))}
             </div>
