@@ -233,42 +233,42 @@ const AddStockModal = ({ isOpen, onClose, onAddStock }) => {
                 <form onSubmit={handleSubmit}>
                   <div className="space-y-4">
                     {/* Position Size Recommendation */}
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
-                      <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-3 flex items-center">
                         <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         Position Size Recommendation
                       </h4>
-                      <p className="text-xs text-blue-700 mb-3">
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
                         Based on volatility (ATR) and your risk tolerance. Stop loss is set at 2× ATR below entry price.
                       </p>
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="bg-white rounded p-2 border border-blue-100">
-                          <span className="text-blue-600 text-xs font-medium">Current Price</span>
-                          <div className="text-blue-900 font-semibold">${positionSizeData.current_price.toFixed(2)}</div>
+                        <div className="bg-white dark:bg-blue-800/30 rounded p-2 border border-blue-100 dark:border-blue-600">
+                          <span className="text-blue-600 dark:text-blue-300 text-xs font-medium">Current Price</span>
+                          <div className="text-blue-900 dark:text-blue-100 font-semibold">${positionSizeData.current_price.toFixed(2)}</div>
                         </div>
-                                            <div className="bg-white rounded p-2 border border-blue-100">
-                      <span className="text-blue-600 text-xs font-medium">ATR (Volatility)</span>
-                      <div className="text-blue-900 font-semibold">${positionSizeData.atr.toFixed(2)}</div>
-                      {positionSizeData.volatility_source && (
-                        <div className="text-blue-500 text-xs mt-1">
-                          Source: {positionSizeData.volatility_source}
+                        <div className="bg-white dark:bg-blue-800/30 rounded p-2 border border-blue-100 dark:border-blue-600">
+                          <span className="text-blue-600 dark:text-blue-300 text-xs font-medium">ATR (Volatility)</span>
+                          <div className="text-blue-900 dark:text-blue-100 font-semibold">${positionSizeData.atr.toFixed(2)}</div>
+                          {positionSizeData.volatility_source && (
+                            <div className="text-blue-500 dark:text-blue-400 text-xs mt-1">
+                              Source: {positionSizeData.volatility_source}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                        <div className="bg-white rounded p-2 border border-blue-100">
-                          <span className="text-blue-600 text-xs font-medium">Stop Loss Price</span>
-                          <div className="text-blue-900 font-semibold">${positionSizeData.stop_loss_price.toFixed(2)}</div>
+                        <div className="bg-white dark:bg-blue-800/30 rounded p-2 border border-blue-100 dark:border-blue-600">
+                          <span className="text-blue-600 dark:text-blue-300 text-xs font-medium">Stop Loss Price</span>
+                          <div className="text-blue-900 dark:text-blue-100 font-semibold">${positionSizeData.stop_loss_price.toFixed(2)}</div>
                         </div>
-                        <div className="bg-white rounded p-2 border border-blue-100">
-                          <span className="text-blue-600 text-xs font-medium">Risk Amount</span>
-                          <div className="text-blue-900 font-semibold">${positionSizeData.risk_amount.toFixed(2)}</div>
+                        <div className="bg-white dark:bg-blue-800/30 rounded p-2 border border-blue-100 dark:border-blue-600">
+                          <span className="text-blue-600 dark:text-blue-300 text-xs font-medium">Risk Amount</span>
+                          <div className="text-blue-900 dark:text-blue-100 font-semibold">${positionSizeData.risk_amount.toFixed(2)}</div>
                         </div>
-                        <div className="bg-green-50 rounded p-2 border border-green-200 col-span-2">
-                          <span className="text-green-700 text-xs font-medium">Recommended Position</span>
-                          <div className="text-green-900 font-semibold text-lg">{positionSizeData.recommended_shares.toFixed(2)} shares</div>
-                          <div className="text-green-700 text-sm">${positionSizeData.position_value.toFixed(2)} total value</div>
+                        <div className="bg-green-50 dark:bg-green-900/20 rounded p-2 border border-green-200 dark:border-green-700 col-span-2">
+                          <span className="text-green-700 dark:text-green-300 text-xs font-medium">Recommended Position</span>
+                          <div className="text-green-900 dark:text-green-100 font-semibold text-lg">{positionSizeData.recommended_shares.toFixed(2)} shares</div>
+                          <div className="text-green-700 dark:text-green-300 text-sm">${positionSizeData.position_value.toFixed(2)} total value</div>
                         </div>
                       </div>
                     </div>
