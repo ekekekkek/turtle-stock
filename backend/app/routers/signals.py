@@ -8,6 +8,7 @@ from app.schemas.signal import SignalResponse
 from app.models.signal import Signal
 from app.services.signal_service import signal_service
 from app.models.market_analysis_status import MarketAnalysisStatus
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -104,5 +105,94 @@ def admin_force_analyze(
 
 @router.get("/status")
 def get_analysis_status(db: Session = Depends(get_db)):
-    status = db.query(MarketAnalysisStatus).first()
-    return {"last_run": status.last_run.isoformat() if status and status.last_run else None} 
+    """Get the status of market analysis and scheduler."""
+    try:
+        # Get market analysis status
+        status = db.query(MarketAnalysisStatus).first()
+        
+        # Get scheduler status from main.py
+        from main import scheduler
+        
+        scheduler_info = {}
+        if scheduler and scheduler.running:
+            jobs = []
+            for job in scheduler.get_jobs():
+                jobs.append({
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                    "trigger": str(job.trigger)
+                })
+            
+            scheduler_info = {
+                "status": "running",
+                "jobs": jobs
+            }
+        else:
+            scheduler_info = {
+                "status": "stopped",
+                "jobs": []
+            }
+        
+        return {
+            "market_analysis": {
+                "last_run": status.last_run.isoformat() if status and status.last_run else None,
+                "status": "completed" if status and status.last_run else "pending"
+            },
+            "scheduler": scheduler_info
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+@router.get("/scheduler/status")
+def get_scheduler_status():
+    """Get detailed scheduler status and health."""
+    try:
+        from main import scheduler
+        
+        if not scheduler:
+            return {
+                "status": "not_initialized",
+                "running": False,
+                "jobs": [],
+                "error": "Scheduler not initialized"
+            }
+        
+        jobs = []
+        for job in scheduler.get_jobs():
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger": str(job.trigger),
+                "active": True
+            })
+        
+        return {
+            "status": "running" if scheduler.running else "stopped",
+            "running": scheduler.running,
+            "jobs": jobs,
+            "job_count": len(jobs),
+            "timezone": str(scheduler.timezone) if scheduler.timezone else "UTC"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get scheduler status: {str(e)}")
+
+@router.post("/scheduler/trigger")
+def trigger_manual_analysis(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Manually trigger market analysis (admin only)."""
+    if not getattr(current_user, 'is_admin', False):
+        raise HTTPException(status_code=403, detail="Admin privileges required.")
+    
+    try:
+        signals = signal_service.generate_daily_market_analysis(db)
+        return {
+            "message": f"Manual market analysis completed. Generated {len(signals)} signals.",
+            "signals_count": len(signals),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger analysis: {str(e)}") 
