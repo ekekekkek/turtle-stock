@@ -137,6 +137,10 @@ export const signalsAPI = {
   generateSignals: () => api.post('/api/signals/generate'),
   getSignalsStatus: () => api.get('/api/signals/status'),
   getUniqueStocksCount: () => api.get('/api/signals/unique-stocks-count'),
+  
+  // New scheduler-related endpoints
+  getSchedulerStatus: () => api.get('/api/signals/scheduler/status'),
+  triggerManualAnalysis: () => api.post('/api/signals/scheduler/trigger'),
 };
 
 export default api; 

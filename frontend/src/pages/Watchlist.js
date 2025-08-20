@@ -29,6 +29,10 @@ const Watchlist = () => {
   const [signalsRequested, setSignalsRequested] = useState(false);
   const [showHold, setShowHold] = useState(false);
   const [uniqueStocksCount, setUniqueStocksCount] = useState(0);
+  
+  // New state for scheduler status
+  const [schedulerStatus, setSchedulerStatus] = useState(null);
+  const [schedulerLoading, setSchedulerLoading] = useState(false);
 
   useEffect(() => {
     fetchWatchlist();
@@ -38,6 +42,7 @@ const Watchlist = () => {
   useEffect(() => {
     if (isAuthenticated) {
       handleGetSignals();
+      fetchSchedulerStatus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -134,6 +139,55 @@ const Watchlist = () => {
     stock.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Scheduler-related helper functions
+  const fetchSchedulerStatus = async () => {
+    try {
+      setSchedulerLoading(true);
+      const res = await signalsAPI.getSchedulerStatus();
+      setSchedulerStatus(res.data);
+    } catch (err) {
+      console.error('Error fetching scheduler status:', err);
+      setSchedulerStatus(null);
+    } finally {
+      setSchedulerLoading(false);
+    }
+  };
+
+  const formatNextRunTime = (isoString) => {
+    if (!isoString) return 'Not scheduled';
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = date - now;
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (diffMs < 0) return 'Overdue';
+      if (diffHours > 0) return `in ${diffHours}h ${diffMinutes}m`;
+      return `in ${diffMinutes}m`;
+    } catch (e) {
+      return 'Invalid time';
+    }
+  };
+
+  const getSchedulerStatusColor = (status) => {
+    switch (status) {
+      case 'running': return 'text-green-600 dark:text-green-400';
+      case 'stopped': return 'text-red-600 dark:text-red-400';
+      case 'not_initialized': return 'text-yellow-600 dark:text-yellow-400';
+      default: return 'text-gray-600 dark:text-gray-400';
+    }
+  };
+
+  const getSchedulerStatusIcon = (status) => {
+    switch (status) {
+      case 'running': return '🟢';
+      case 'stopped': return '🔴';
+      case 'not_initialized': return '🟡';
+      default: return '⚪';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -196,6 +250,58 @@ const Watchlist = () => {
       {/* Daily Signals Section */}
       {isAuthenticated && (
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6 dark:from-gray-950 dark:to-gray-950 dark:bg-gray-950 dark:border-gray-700">
+          {/* Scheduler Status Section */}
+          <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-yellow-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Automation Status</h3>
+              <button
+                onClick={fetchSchedulerStatus}
+                disabled={schedulerLoading}
+                className="text-sm text-blue-600 hover:text-blue-700 underline dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                {schedulerLoading ? 'Refreshing...' : 'Refresh Status'}
+              </button>
+            </div>
+            
+            {schedulerStatus ? (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">{getSchedulerStatusIcon(schedulerStatus.status)}</span>
+                  <span className={`font-medium ${getSchedulerStatusColor(schedulerStatus.status)}`}>
+                    Scheduler: {schedulerStatus.status}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    ({schedulerStatus.job_count} jobs active)
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {schedulerStatus.jobs.map((job) => (
+                    <div key={job.id} className="text-sm bg-gray-50 dark:bg-gray-700 p-3 rounded border">
+                      <div className="font-medium text-gray-800 dark:text-white">{job.name}</div>
+                      <div className="text-gray-600 dark:text-gray-300">
+                        Next run: {formatNextRunTime(job.next_run)}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {job.trigger}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Timezone: {schedulerStatus.timezone}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-gray-500 dark:text-gray-400">
+                  {schedulerLoading ? 'Loading scheduler status...' : 'Unable to load scheduler status'}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
               <SparklesIcon className="w-6 h-6 text-yellow-600 mr-2 dark:text-yellow-400" />
@@ -207,7 +313,7 @@ const Watchlist = () => {
                 disabled={signalsLoading}
                 className="text-sm text-yellow-700 hover:text-yellow-800 underline dark:text-white dark:hover:text-gray-300"
               >
-                {signalsLoading ? 'Loading...' : 'Refresh'}
+                {signalsLoading ? 'Loading...' : 'Get Daily Signals'}
               </button>
               <button
                 onClick={() => setShowHold((prev) => !prev)}
@@ -225,6 +331,9 @@ const Watchlist = () => {
               <div className="mb-4 text-sm text-yellow-700 dark:text-white">
                 <p>Analysis of {uniqueStocksCount} unique stocks from S&P 500 and Nasdaq 100</p>
                 <p>Signals based on {signals[0]?.date ? new Date(signals[0].date).toLocaleDateString() : 'yesterday'}'s market data</p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+                  💡 Analysis runs automatically at 5:00 PM ET daily. Results are ready instantly when you click "Get Daily Signals".
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm dark:bg-gray-950">
@@ -283,7 +392,12 @@ const Watchlist = () => {
             <div className="text-center py-8">
               <SparklesIcon className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
               <p className="text-yellow-700 dark:text-yellow-300 mb-4">No market analysis available</p>
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">Click "Get Daily Signals" to analyze S&P 500 and Nasdaq stocks</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-2">
+                Click "Get Daily Signals" to retrieve today's pre-computed analysis
+              </p>
+              <p className="text-xs text-yellow-500 dark:text-yellow-400">
+                💡 Analysis runs automatically at 5:00 PM ET daily. No waiting required!
+              </p>
             </div>
           )}
         </div>

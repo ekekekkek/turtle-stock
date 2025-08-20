@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
+import logging
+from datetime import datetime, timezone
+import pytz
 
 from app.core.config import settings
 from app.core.database import engine, SessionLocal
@@ -13,31 +16,118 @@ from app.routers.signals import router as signals_router
 # APScheduler imports
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-import pytz
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from app.services.signal_service import signal_service
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global scheduler instance
+scheduler = None
+
+def daily_market_job():
+    """Daily market analysis job with comprehensive error handling"""
+    logger.info("[Scheduler] Starting daily market analysis...")
+    start_time = datetime.now()
+    
+    db = SessionLocal()
+    try:
+        # Check if analysis already exists for today
+        from app.models.signal import Signal
+        today = datetime.now(timezone.utc).date()
+        existing_signals = db.query(Signal).filter(Signal.date == today).first()
+        
+        if existing_signals:
+            logger.info(f"[Scheduler] Analysis already completed for {today}")
+            return
+        
+        # Run the analysis
+        signals = signal_service.generate_daily_market_analysis(db)
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        logger.info(f"[Scheduler] Daily market analysis completed successfully!")
+        logger.info(f"[Scheduler] Generated {len(signals)} signals in {duration:.2f} seconds")
+        
+    except Exception as e:
+        logger.error(f"[Scheduler] Error during daily market analysis: {str(e)}")
+        logger.exception("Full traceback:")
+    finally:
+        db.close()
+
+def job_listener(event):
+    """Listen for job execution events"""
+    if event.exception:
+        logger.error(f"[Scheduler] Job failed: {event.exception}")
+        logger.error(f"[Scheduler] Job traceback: {event.traceback}")
+    else:
+        logger.info(f"[Scheduler] Job executed successfully: {event.job_id}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- startup ---
-    print("Starting up Turtle Stock Platform...")
+    global scheduler
+    logger.info("Starting up Turtle Stock Platform...")
     Base.metadata.create_all(bind=engine)
-    # Start scheduler
-    scheduler = BackgroundScheduler(timezone=pytz.timezone('US/Eastern'))
-    def daily_market_job():
-        print("[Scheduler] Running daily market analysis...")
-        db = SessionLocal()
-        try:
-            signal_service.generate_daily_market_analysis(db)
-        finally:
-            db.close()
-    # Run every day at 5:00pm US Eastern Time
-    scheduler.add_job(daily_market_job, CronTrigger(hour=17, minute=0))
-    scheduler.start()
-    print("Scheduler started: daily market analysis at 5:00pm US/Eastern")
+    
+    # Initialize and start scheduler
+    try:
+        scheduler = BackgroundScheduler(
+            timezone=pytz.timezone('US/Eastern'),
+            job_defaults={'max_instances': 1, 'coalesce': True}
+        )
+        
+        # Add job listener for monitoring
+        scheduler.add_listener(job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+        
+        # Primary run: After market close (5:00 PM ET)
+        scheduler.add_job(
+            daily_market_job, 
+            CronTrigger(hour=17, minute=0, timezone='US/Eastern'),
+            id='daily_market_analysis',
+            name='Daily Market Analysis - After Close',
+            replace_existing=True
+        )
+        
+        # Backup run: Market open (9:30 AM ET) - in case after-hours run fails
+        scheduler.add_job(
+            daily_market_job, 
+            CronTrigger(hour=9, minute=30, timezone='US/Eastern'),
+            id='daily_market_analysis_backup',
+            name='Daily Market Analysis - Market Open (Backup)',
+            replace_existing=True
+        )
+        
+        # Weekend cleanup job (Saturday at 2:00 AM ET)
+        scheduler.add_job(
+            lambda: logger.info("[Scheduler] Weekend cleanup job executed"),
+            CronTrigger(day_of_week='sat', hour=2, minute=0, timezone='US/Eastern'),
+            id='weekend_cleanup',
+            name='Weekend Cleanup',
+            replace_existing=True
+        )
+        
+        scheduler.start()
+        logger.info("✅ Scheduler started successfully!")
+        logger.info("📅 Jobs scheduled:")
+        for job in scheduler.get_jobs():
+            logger.info(f"   - {job.name}: {job.next_run_time}")
+            
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {str(e)}")
+        logger.exception("Scheduler startup error:")
+    
     yield
+    
     # --- shutdown ---
-    print("Shutting down Turtle Stock Platform...")
-    scheduler.shutdown()
+    logger.info("Shutting down Turtle Stock Platform...")
+    if scheduler:
+        try:
+            scheduler.shutdown()
+            logger.info("✅ Scheduler shut down successfully")
+        except Exception as e:
+            logger.error(f"Error shutting down scheduler: {str(e)}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
