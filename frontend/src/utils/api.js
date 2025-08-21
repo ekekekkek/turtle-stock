@@ -1,17 +1,17 @@
 import axios from 'axios';
 
 // Create axios instance with base configuration
-const API_BASE = process.env.REACT_APP_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+const BASE = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
 
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: BASE,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-console.log('API Base URL:', API_BASE);
+console.log('API Base URL:', BASE);
 
 // Request interceptor for adding auth tokens
 api.interceptors.request.use(

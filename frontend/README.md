@@ -50,7 +50,7 @@ A modern, responsive React-based frontend for the Turtle Stock Platform, designe
 3. **Configure environment variables**:
    Create a `.env` file in the frontend directory:
    ```env
-   REACT_APP_API_URL=http://localhost:8000
+   REACT_APP_API_URL=https://eugeenie.onrender.com
    ```
 
 4. **Start the development server**:
@@ -132,7 +132,7 @@ The frontend is designed to work with a FastAPI backend. The API configuration i
 Create a `.env` file in the frontend directory to configure environment variables:
 
 ```env
-REACT_APP_API_URL=http://localhost:8000
+REACT_APP_API_URL=https://eugeenie.onrender.com
 ```
 
 ## Styling
