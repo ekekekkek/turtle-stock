@@ -195,4 +195,30 @@ def trigger_manual_analysis(
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to trigger analysis: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to trigger analysis: {str(e)}")
+
+@router.post("/tasks/run-daily")
+def run_daily_tasks(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """Protected endpoint for running daily tasks via external scheduler (GitHub Actions)."""
+    # Simple token-based authentication for external schedulers
+    import os
+    expected_token = os.getenv("DAILY_TASKS_TOKEN", "default_token_for_dev")
+    
+    if token != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    try:
+        # Run the daily market analysis
+        signals = signal_service.generate_daily_market_analysis(db)
+        
+        return {
+            "message": "Daily tasks completed successfully",
+            "signals_generated": len(signals),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "success"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run daily tasks: {str(e)}") 

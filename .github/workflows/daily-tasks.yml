@@ -1,0 +1,49 @@
+name: Daily Tasks Scheduler
+
+on:
+  schedule:
+    # Run daily at 5:00 PM ET (after market close)
+    - cron: '0 21 * * 1-5'  # Monday-Friday at 9 PM UTC (5 PM ET)
+  
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  run-daily-tasks:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Run Daily Market Analysis
+      run: |
+        # Get the current date for logging
+        echo "Running daily tasks at $(date)"
+        
+        # Make HTTP request to the protected endpoint
+        curl -X POST \
+          "https://turtle-stock-api.onrender.com/api/signals/tasks/run-daily" \
+          -H "Content-Type: application/json" \
+          -d "{\"token\": \"${{ secrets.DAILY_TASKS_TOKEN}}\"}" \
+          --max-time 300 \
+          --retry 3 \
+          --retry-delay 10
+        
+        echo "Daily tasks completed"
+      
+      env:
+        # This token should be set in your repository secrets
+        # Go to Settings > Secrets and variables > Actions
+        # Add DAILY_TASKS_TOKEN with the value you set in your backend
+        DAILY_TASKS_TOKEN: ${{ secrets.DAILY_TASKS_TOKEN }}
+    
+    - name: Handle Success
+      if: success()
+      run: |
+        echo "✅ Daily tasks completed successfully"
+        echo "Timestamp: $(date)"
+    
+    - name: Handle Failure
+      if: failure()
+      run: |
+        echo "❌ Daily tasks failed"
+        echo "Timestamp: $(date)"
+        # You could add notification logic here (Slack, email, etc.) 
