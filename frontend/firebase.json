@@ -6,7 +6,7 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "predeploy": ["npm run build:frontend"],
+    "predeploy": ["npm run build"],
     "rewrites": [
       {
         "source": "**",
