@@ -21,6 +21,11 @@ class AuthService:
 
     def get_password_hash(self, password: str) -> str:
         """Hash a password"""
+        # Bcrypt has a 72-byte limit - truncate if necessary (defensive programming)
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Truncate to 72 bytes (should rarely happen due to validation, but be safe)
+            password = password_bytes[:72].decode('utf-8', errors='ignore')
         return pwd_context.hash(password)
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
