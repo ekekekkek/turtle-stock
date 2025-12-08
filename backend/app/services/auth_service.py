@@ -24,8 +24,12 @@ class AuthService:
         # Bcrypt has a 72-byte limit - truncate if necessary (defensive programming)
         password_bytes = password.encode('utf-8')
         if len(password_bytes) > 72:
-            # Truncate to 72 bytes (should rarely happen due to validation, but be safe)
-            password = password_bytes[:72].decode('utf-8', errors='ignore')
+            # Truncate to 72 bytes, ensuring we don't break UTF-8 characters
+            truncated_bytes = password_bytes[:72]
+            # Remove any incomplete UTF-8 character at the end
+            while truncated_bytes and (truncated_bytes[-1] & 0b11000000) == 0b10000000:
+                truncated_bytes = truncated_bytes[:-1]
+            password = truncated_bytes.decode('utf-8', errors='ignore')
         return pwd_context.hash(password)
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
