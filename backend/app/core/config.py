@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ]
     
     # Database
-    DATABASE_URL: str = "sqlite:///backend/turtle_stock.db"
+    DATABASE_URL: str = "sqlite:///./turtle_stock.db"
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"

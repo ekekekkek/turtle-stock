@@ -56,8 +56,8 @@ class SignalService:
         try:
             print(f"DEBUG: Fetching {days} days of data for {symbol} from Yahoo Finance")
             
-            # Add small delay to prevent overwhelming Yahoo Finance
-            time.sleep(0.1)
+            # Increase delay to avoid rate limiting - Yahoo Finance is stricter now
+            time.sleep(2.0)  # Changed from 0.1 to 2.0 seconds
             
             # Calculate date range
             end_date = datetime.now(timezone.utc)
@@ -68,26 +68,56 @@ class SignalService:
             # Get data from Yahoo Finance with better error handling
             ticker = yf.Ticker(symbol)
             
-            # Try to get info first to validate the symbol
-            try:
-                info = ticker.info
-                if not info or 'regularMarketPrice' not in info:
-                    print(f"WARNING: Invalid symbol or no data available for {symbol} on Yahoo Finance")
-                    return None
-                print(f"DEBUG: {symbol} info validated successfully")
-            except Exception as e:
-                print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance: {e}")
-                return None
+            # Try to get info first to validate the symbol with retry logic
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    info = ticker.info
+                    if not info or 'regularMarketPrice' not in info:
+                        print(f"WARNING: Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                        return None
+                    print(f"DEBUG: {symbol} info validated successfully")
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
+                        if attempt < max_retries - 1:
+                            wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
+                            print(f"WARNING: Rate limited for {symbol}, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance after {max_retries} attempts: {e}")
+                            return None
+                    else:
+                        print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance: {e}")
+                        return None
             
-            # Get historical data
-            print(f"DEBUG: Fetching historical data for {symbol}...")
-            hist = ticker.history(start=start_date, end=end_date, interval='1d')
-            
-            if hist.empty:
-                print(f"WARNING: No data returned from Yahoo Finance for {symbol}")
-                return None
-            
-            print(f"DEBUG: {symbol} - Retrieved {len(hist)} data points")
+            # Get historical data with retry logic
+            for attempt in range(max_retries):
+                try:
+                    print(f"DEBUG: Fetching historical data for {symbol}...")
+                    hist = ticker.history(start=start_date, end=end_date, interval='1d')
+                    
+                    if hist.empty:
+                        print(f"WARNING: No data returned from Yahoo Finance for {symbol}")
+                        return None
+                    
+                    print(f"DEBUG: {symbol} - Retrieved {len(hist)} data points")
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
+                        if attempt < max_retries - 1:
+                            wait_time = (attempt + 1) * 5
+                            print(f"WARNING: Rate limited fetching history for {symbol}, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                            time.sleep(wait_time)
+                            continue
+                        else:
+                            print(f"ERROR: Rate limited for {symbol} after {max_retries} attempts")
+                            return None
+                    else:
+                        raise  # Re-raise if it's not a rate limit error
             
             # Convert to Finnhub format
             timestamps = [int(dt.timestamp()) for dt in hist.index]

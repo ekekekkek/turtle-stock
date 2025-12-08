@@ -15,6 +15,7 @@ venv/
 env/
 .venv/
 ENV/
+frotend/.env
 
 # Jupyter / IPython
 .ipynb_checkpoints/

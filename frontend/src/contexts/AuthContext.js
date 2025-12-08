@@ -31,7 +31,12 @@ export const AuthProvider = ({ children }) => {
         setUser(response.data);
         setIsAuthenticated(true);
       } catch (error) {
-        console.error('Auth check failed:', error);
+        // Silently handle invalid tokens - this is expected if user logged out or token expired
+        if (error.response?.status === 401) {
+          console.log('No valid session found, clearing stored token');
+        } else {
+          console.error('Auth check failed:', error);
+        }
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
       }
@@ -56,6 +61,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       const message = error.response?.data?.detail || 'Login failed';
       toast.error(message);
+      console.error('Login error:', error);
       return false;
     }
   };
@@ -63,7 +69,14 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await userAPI.register(userData);
-      setUser(response.data);
+      const { access_token } = response.data;
+      
+      // Store the token
+      localStorage.setItem('authToken', access_token);
+      
+      // Get user profile
+      const profileResponse = await userAPI.getProfile();
+      setUser(profileResponse.data);
       setIsAuthenticated(true);
       
       toast.success('Registration successful!');
@@ -71,6 +84,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       const message = error.response?.data?.detail || 'Registration failed';
       toast.error(message);
+      console.error('Registration error:', error);
       return false;
     }
   };

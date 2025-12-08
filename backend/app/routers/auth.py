@@ -8,9 +8,9 @@ from app.models.user import User
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=Token)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user"""
+    """Register a new user and return access token"""
     # Check if user already exists
     db_user = auth_service.get_user_by_email(db, email=user.email)
     if db_user:
@@ -28,7 +28,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         )
     
     # Create new user
-    return auth_service.create_user(db=db, user=user)
+    new_user = auth_service.create_user(db=db, user=user)
+    
+    # Generate access token for the new user
+    access_token = auth_service.create_access_token(data={"sub": new_user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):

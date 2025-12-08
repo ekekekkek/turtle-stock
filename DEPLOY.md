@@ -1,12 +1,12 @@
 # Deployment Guide - Turtle Stock Platform
 
-This guide covers deploying the backend to Render and keeping the frontend on Firebase Hosting.
+This guide covers deploying the backend to Render and the frontend to either **Vercel** (recommended) or **Firebase Hosting**.
 
 ## Prerequisites
 
 - GitHub repository with the turtle-stock monorepo
-- Firebase project set up
-- Render account
+- Render account (for backend)
+- Vercel account (recommended for frontend) OR Firebase project (alternative)
 
 ## Backend Deployment (Render)
 

@@ -138,7 +138,7 @@ app = FastAPI(
 # --- CORS must come before including any routers ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://turtle-stock.web.app", "http://localhost:3000"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,                   # allow Authorization header / cookies
     allow_methods=["*"],
     allow_headers=["*"],

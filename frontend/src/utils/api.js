@@ -5,13 +5,16 @@ const BASE = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '') || 'http:/
 
 const api = axios.create({
   baseURL: BASE,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for production deployments
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 console.log('API Base URL:', BASE);
+if (!BASE || BASE === 'http://localhost:8000') {
+  console.warn('⚠️ API URL not configured! Using default localhost. Set REACT_APP_API_URL environment variable for production.');
+}
 
 // Request interceptor for adding auth tokens
 api.interceptors.request.use(
@@ -37,10 +40,25 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Response Error:', error.response?.status, error.response?.data, error.config?.url);
+    
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network error - no response from server:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('Request timeout - server may be unavailable');
+      } else if (error.message === 'Network Error') {
+        console.error('Network Error - CORS issue or server unreachable');
+      }
+    }
+    
     if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
+      // Handle unauthorized access - only redirect if not already on login/register page
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
