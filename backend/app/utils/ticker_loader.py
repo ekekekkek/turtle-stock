@@ -37,11 +37,40 @@ def scrape_nasdaq100():
     table = soup.find("table", {"id": "constituents"})
     if not table:
         # Fallback: try the first table (Wikipedia sometimes changes structure)
-        table = soup.find_all("table")[1]
+        tables = soup.find_all("table")
+        for t in tables:
+            # Look for table with "Ticker" in header
+            headers = t.find("thead")
+            if headers:
+                header_text = headers.get_text().upper()
+                if "TICKER" in header_text or "SYMBOL" in header_text:
+                    table = t
+                    break
+        if not table and len(tables) > 1:
+            table = tables[1]
+    
+    if not table:
+        raise ValueError("Could not find Nasdaq-100 table on Wikipedia")
+    
     tickers = []
+    # Find header row to identify ticker column
+    ticker_col_idx = 0  # Default to first column
+    header_row = table.find("thead")
+    if header_row:
+        headers = [th.get_text().strip().upper() for th in header_row.find_all("th")]
+        for i, header in enumerate(headers):
+            if "TICKER" in header or "SYMBOL" in header:
+                ticker_col_idx = i
+                break
+    
     for row in table.find("tbody").find_all("tr")[1:]:
-        symbol = row.find_all("td")[1].text.strip().replace(".", "-")
-        tickers.append(symbol)
+        cells = row.find_all("td")
+        if len(cells) > ticker_col_idx:
+            symbol = cells[ticker_col_idx].text.strip().replace(".", "-")
+            # Validate it looks like a ticker (uppercase letters, maybe numbers, maybe dash)
+            if symbol and symbol.replace("-", "").replace(".", "").isalnum() and len(symbol) <= 10:
+                tickers.append(symbol)
+    
     return tickers
 
 def load_or_scrape_tickers():

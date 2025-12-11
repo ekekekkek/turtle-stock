@@ -67,11 +67,29 @@ class StockService:
             # Try to get info first to validate the symbol
             try:
                 info = ticker.info
-                if not info or 'regularMarketPrice' not in info:
-                    logger.warning(f"Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                if not info:
+                    logger.warning(f"No info returned for {symbol} on Yahoo Finance")
+                    return None
+                
+                # Check if we have any price data (works even when market is closed)
+                # When market is closed, regularMarketPrice might not exist, but previousClose should
+                has_price_data = (
+                    'regularMarketPrice' in info or 
+                    'previousClose' in info or 
+                    'currentPrice' in info or
+                    'quotePrice' in info
+                )
+                
+                if not has_price_data:
+                    logger.warning(f"No price data available for {symbol} on Yahoo Finance (may be invalid symbol)")
                     return None
             except Exception as e:
-                logger.warning(f"Could not validate symbol {symbol} on Yahoo Finance: {e}")
+                error_msg = str(e)
+                # Handle HTTP 404 errors specifically
+                if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
+                    logger.warning(f"Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
+                else:
+                    logger.warning(f"Could not validate symbol {symbol} on Yahoo Finance: {e}")
                 return None
             
             # Get historical data
@@ -102,7 +120,12 @@ class StockService:
                 "data": data,
             }
         except Exception as e:
-            logger.error(f"Yahoo Finance fallback failed for {symbol}: {e}")
+            error_msg = str(e)
+            # Handle HTTP 404 errors specifically
+            if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
+                logger.warning(f"Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
+            else:
+                logger.error(f"Yahoo Finance fallback failed for {symbol}: {e}")
             return None
 
     def get_stock_quote(self, symbol: str) -> Optional[Dict[str, Any]]:

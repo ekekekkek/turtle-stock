@@ -73,14 +73,31 @@ class SignalService:
             for attempt in range(max_retries):
                 try:
                     info = ticker.info
-                    if not info or 'regularMarketPrice' not in info:
-                        print(f"WARNING: Invalid symbol or no data available for {symbol} on Yahoo Finance")
+                    if not info:
+                        print(f"WARNING: No info returned for {symbol} on Yahoo Finance")
+                        return None
+                    
+                    # Check if we have any price data (works even when market is closed)
+                    # When market is closed, regularMarketPrice might not exist, but previousClose should
+                    has_price_data = (
+                        'regularMarketPrice' in info or 
+                        'previousClose' in info or 
+                        'currentPrice' in info or
+                        'quotePrice' in info
+                    )
+                    
+                    if not has_price_data:
+                        print(f"WARNING: No price data available for {symbol} on Yahoo Finance (may be invalid symbol)")
                         return None
                     print(f"DEBUG: {symbol} info validated successfully")
                     break
                 except Exception as e:
                     error_msg = str(e)
-                    if "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
+                    # Handle HTTP 404 errors specifically
+                    if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
+                        print(f"WARNING: Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
+                        return None
+                    elif "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
                         if attempt < max_retries - 1:
                             wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
                             print(f"WARNING: Rate limited for {symbol}, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
@@ -107,7 +124,11 @@ class SignalService:
                     break
                 except Exception as e:
                     error_msg = str(e)
-                    if "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
+                    # Handle HTTP 404 errors specifically
+                    if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
+                        print(f"WARNING: Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
+                        return None
+                    elif "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
                         if attempt < max_retries - 1:
                             wait_time = (attempt + 1) * 5
                             print(f"WARNING: Rate limited fetching history for {symbol}, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
@@ -117,7 +138,7 @@ class SignalService:
                             print(f"ERROR: Rate limited for {symbol} after {max_retries} attempts")
                             return None
                     else:
-                        raise  # Re-raise if it's not a rate limit error
+                        raise  # Re-raise if it's not a rate limit or 404 error
             
             # Convert to Finnhub format
             timestamps = [int(dt.timestamp()) for dt in hist.index]
@@ -142,15 +163,33 @@ class SignalService:
             return result
             
         except Exception as e:
-            print(f"ERROR: Error fetching data from Yahoo Finance for {symbol}: {e}")
+            error_msg = str(e)
+            # Handle HTTP 404 errors specifically
+            if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
+                print(f"WARNING: Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
+            else:
+                print(f"ERROR: Error fetching data from Yahoo Finance for {symbol}: {e}")
             return None
 
     def initialize_stock_lists(self):
         try:
             from app.utils.ticker_loader import load_or_scrape_tickers
             self.sp500_symbols, self.nasdaq_symbols = load_or_scrape_tickers()
+            
+            # Filter out invalid tickers (company names, empty strings, etc.)
+            def is_valid_ticker(symbol):
+                if not symbol or not isinstance(symbol, str):
+                    return False
+                # Remove common suffixes and check if it's alphanumeric with dashes/dots
+                cleaned = symbol.replace("-", "").replace(".", "").strip()
+                # Should be uppercase, alphanumeric, and reasonable length
+                return cleaned.isalnum() and len(symbol) <= 10 and symbol.isupper()
+            
+            self.sp500_symbols = [s for s in self.sp500_symbols if is_valid_ticker(s)]
+            self.nasdaq_symbols = [s for s in self.nasdaq_symbols if is_valid_ticker(s)]
             self.all_symbols = list(set(self.sp500_symbols + self.nasdaq_symbols))
             print(f"Loaded {len(self.sp500_symbols)} S&P 500 and {len(self.nasdaq_symbols)} Nasdaq-100 tickers.")
+            print(f"Total unique tickers: {len(self.all_symbols)}")
         except Exception as e:
             print(f"Error initializing stock lists: {e}")
             self.all_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
