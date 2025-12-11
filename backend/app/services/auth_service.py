@@ -96,6 +96,8 @@ class AuthService:
 
     def verify_token(self, token: str) -> Optional[str]:
         """Verify and decode a JWT token (supports both Firebase ID tokens and legacy JWT tokens)"""
+        print(f"DEBUG: verify_token called - FIREBASE_ADMIN_AVAILABLE: {FIREBASE_ADMIN_AVAILABLE}, firebase_app: {self.firebase_app is not None}")
+        
         # First, try to verify as Firebase ID token using Admin SDK (proper verification)
         if FIREBASE_ADMIN_AVAILABLE and self.firebase_app:
             try:

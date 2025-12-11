@@ -39,15 +39,44 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-    """Login user and return access token"""
-    user = auth_service.authenticate_user(db, user_credentials.email, user_credentials.password)
+    """
+    Login user and return access token
+    
+    NOTE: This endpoint is deprecated. The frontend now uses Firebase Authentication.
+    This endpoint is kept for backward compatibility only.
+    """
+    print(f"DEBUG: Login attempt for email: {user_credentials.email}")
+    
+    # Check if user exists
+    user = auth_service.get_user_by_email(db, user_credentials.email)
     if not user:
+        print(f"DEBUG: User not found in database: {user_credentials.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Check if this is a Firebase user (they don't have real passwords)
+    if user.hashed_password == "firebase_user_no_password":
+        print(f"DEBUG: Attempted to login Firebase user via legacy endpoint: {user_credentials.email}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This account uses Firebase Authentication. Please use the Firebase login instead.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Authenticate with password
+    user = auth_service.authenticate_user(db, user_credentials.email, user_credentials.password)
+    if not user:
+        print(f"DEBUG: Password authentication failed for: {user_credentials.email}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    print(f"DEBUG: Successful login for: {user_credentials.email}")
     access_token = auth_service.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 

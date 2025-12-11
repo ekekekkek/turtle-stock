@@ -20,10 +20,18 @@ def get_current_user(
     
     token = credentials.credentials
     print(f"DEBUG: Received token (first 20 chars): {token[:20]}...")
+    print(f"DEBUG: Token length: {len(token)}")
+    
     email = auth_service.verify_token(token)
     print(f"DEBUG: Verified email from token: {email}")
+    
     if email is None:
         print("DEBUG: Token verification failed - email is None")
+        print("DEBUG: This could mean:")
+        print("DEBUG:   1. Token is not a valid Firebase token")
+        print("DEBUG:   2. Token issuer doesn't match Firebase project")
+        print("DEBUG:   3. Token is expired or invalid")
+        print("DEBUG:   4. Firebase Admin SDK not initialized (check logs)")
         raise credentials_exception
     
     user = auth_service.get_user_by_email(db, email=email)
