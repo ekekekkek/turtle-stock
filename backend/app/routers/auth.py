@@ -136,14 +136,17 @@ def sync_user(
     full_name = user_data.full_name if user_data else None
     
     try:
+        print(f"DEBUG: Sync endpoint called - attempting to sync user")
         user = auth_service.sync_user_from_firebase(
             db=db,
             token=token,
             username=username,
             full_name=full_name
         )
+        print(f"DEBUG: User synced successfully - ID: {user.id}, Email: {user.email}")
         return user
     except ValueError as e:
+        print(f"DEBUG: Sync failed - ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
@@ -151,7 +154,9 @@ def sync_user(
         )
     except Exception as e:
         print(f"DEBUG: Error syncing user: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to sync user"
+            detail=f"Failed to sync user: {str(e)}"
         ) 

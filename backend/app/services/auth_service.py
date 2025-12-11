@@ -236,33 +236,42 @@ class AuthService:
         If user exists, update their information. If not, create a new user.
         Returns the user object.
         """
+        print(f"DEBUG: sync_user_from_firebase called - username: {username}, full_name: {full_name}")
         token_data = self.verify_token_full(token)
         if not token_data or not token_data.get('email'):
+            print(f"DEBUG: Token verification failed - token_data: {token_data}")
             raise ValueError("Invalid Firebase token: could not extract email")
         
         email = token_data['email']
         firebase_name = token_data.get('name', '') or token_data.get('display_name', '')
+        print(f"DEBUG: Extracted email: {email}, firebase_name: {firebase_name}")
         
         # Use provided name/username or fall back to Firebase data
         final_full_name = full_name or firebase_name or ''
         final_username = username or email.split('@')[0]
+        print(f"DEBUG: Final username: {final_username}, final_full_name: {final_full_name}")
         
         # Check if user already exists
         user = self.get_user_by_email(db, email)
         
         if user:
+            print(f"DEBUG: User already exists - ID: {user.id}, updating if needed")
             # Update existing user if needed
             if final_full_name and not user.full_name:
                 user.full_name = final_full_name
+                print(f"DEBUG: Updated full_name to: {final_full_name}")
             if final_username and user.username != final_username:
                 # Check if new username is available
                 existing_user = db.query(User).filter(User.username == final_username, User.id != user.id).first()
                 if not existing_user:
                     user.username = final_username
+                    print(f"DEBUG: Updated username to: {final_username}")
             db.commit()
             db.refresh(user)
+            print(f"DEBUG: User updated successfully - ID: {user.id}")
             return user
         else:
+            print(f"DEBUG: User does not exist, creating new user")
             # Create new user
             # Ensure username is unique
             base_username = final_username
@@ -270,6 +279,7 @@ class AuthService:
             while db.query(User).filter(User.username == final_username).first():
                 final_username = f"{base_username}{counter}"
                 counter += 1
+                print(f"DEBUG: Username {base_username} taken, trying: {final_username}")
             
             user_data = UserCreate(
                 email=email,
@@ -277,6 +287,8 @@ class AuthService:
                 password="",  # No password needed for Firebase users
                 full_name=final_full_name
             )
-            return self.create_user(db, user_data)
+            new_user = self.create_user(db, user_data)
+            print(f"DEBUG: New user created successfully - ID: {new_user.id}, Email: {new_user.email}")
+            return new_user
 
 auth_service = AuthService() 

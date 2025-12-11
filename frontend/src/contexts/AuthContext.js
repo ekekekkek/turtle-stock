@@ -5,7 +5,9 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
-  sendEmailVerification
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -286,6 +288,77 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Sign in with Google
+  const loginWithGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const firebaseUser = userCredential.user;
+      
+      // Get user data from Google account
+      const username = firebaseUser.displayName?.split(' ')[0] || firebaseUser.email?.split('@')[0] || '';
+      const full_name = firebaseUser.displayName || '';
+      
+      // Create user document in Firestore if it doesn't exist
+      try {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            email: firebaseUser.email,
+            username: username,
+            full_name: full_name,
+            createdAt: new Date().toISOString(),
+            risk_tolerance: 1,
+            capital: 10000
+          });
+        }
+      } catch (error) {
+        console.error('Error creating Firestore user:', error);
+      }
+      
+      // Sync with backend database
+      try {
+        const token = await firebaseUser.getIdToken();
+        await api.post('/api/auth/sync', {
+          ...(username && { username }),
+          ...(full_name && { full_name })
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        syncedUsersRef.current.add(firebaseUser.uid);
+        console.log('✅ User synced with backend database after Google login');
+      } catch (error) {
+        console.error('❌ Error syncing user with backend after Google login:', error);
+        // Don't fail login if backend sync fails - onAuthStateChanged will retry
+      }
+      
+      toast.success('Login successful!');
+      return true;
+    } catch (error) {
+      let errorMessage = 'Google sign-in failed';
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Sign-in popup was closed';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Sign-in popup was blocked. Please allow popups for this site.';
+          break;
+        case 'auth/account-exists-with-different-credential':
+          errorMessage = 'An account already exists with this email using a different sign-in method';
+          break;
+        default:
+          errorMessage = error.message || 'Google sign-in failed';
+      }
+      
+      toast.error(errorMessage);
+      console.error('Google sign-in error:', error);
+      return false;
+    }
+  };
+
   // Get Firebase ID token for backend API calls
   const getIdToken = async () => {
     if (auth.currentUser) {
@@ -301,6 +374,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    loginWithGoogle,
     getIdToken
   };
 
