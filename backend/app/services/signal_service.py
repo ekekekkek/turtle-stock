@@ -68,49 +68,8 @@ class SignalService:
             # Get data from Yahoo Finance with better error handling
             ticker = yf.Ticker(symbol)
             
-            # Try to get info first to validate the symbol with retry logic
+            # Get historical data with retry logic (simplified - just try to get data directly)
             max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    info = ticker.info
-                    if not info:
-                        print(f"WARNING: No info returned for {symbol} on Yahoo Finance")
-                        return None
-                    
-                    # Check if we have any price data (works even when market is closed)
-                    # When market is closed, regularMarketPrice might not exist, but previousClose should
-                    has_price_data = (
-                        'regularMarketPrice' in info or 
-                        'previousClose' in info or 
-                        'currentPrice' in info or
-                        'quotePrice' in info
-                    )
-                    
-                    if not has_price_data:
-                        print(f"WARNING: No price data available for {symbol} on Yahoo Finance (may be invalid symbol)")
-                        return None
-                    print(f"DEBUG: {symbol} info validated successfully")
-                    break
-                except Exception as e:
-                    error_msg = str(e)
-                    # Handle HTTP 404 errors specifically
-                    if "404" in error_msg or "HTTP Error 404" in error_msg or "Not Found" in error_msg:
-                        print(f"WARNING: Symbol {symbol} not found on Yahoo Finance (404 error) - skipping")
-                        return None
-                    elif "Too Many Requests" in error_msg or "429" in error_msg or "rate limit" in error_msg.lower():
-                        if attempt < max_retries - 1:
-                            wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
-                            print(f"WARNING: Rate limited for {symbol}, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance after {max_retries} attempts: {e}")
-                            return None
-                    else:
-                        print(f"WARNING: Could not validate symbol {symbol} on Yahoo Finance: {e}")
-                        return None
-            
-            # Get historical data with retry logic
             for attempt in range(max_retries):
                 try:
                     print(f"DEBUG: Fetching historical data for {symbol}...")
@@ -176,23 +135,30 @@ class SignalService:
             from app.utils.ticker_loader import load_or_scrape_tickers
             self.sp500_symbols, self.nasdaq_symbols = load_or_scrape_tickers()
             
-            # Filter out invalid tickers (company names, empty strings, etc.)
+            # Basic validation - filter out obviously invalid entries (empty, too long, etc.)
             def is_valid_ticker(symbol):
                 if not symbol or not isinstance(symbol, str):
                     return False
-                # Remove common suffixes and check if it's alphanumeric with dashes/dots
-                cleaned = symbol.replace("-", "").replace(".", "").strip()
-                # Should be uppercase, alphanumeric, and reasonable length
-                return cleaned.isalnum() and len(symbol) <= 10 and symbol.isupper()
+                symbol = symbol.strip()
+                # Should be reasonable length and not empty
+                if len(symbol) == 0 or len(symbol) > 10:
+                    return False
+                # Should contain at least some alphanumeric characters
+                cleaned = symbol.replace("-", "").replace(".", "").upper()
+                return cleaned.isalnum() and len(cleaned) > 0
             
-            self.sp500_symbols = [s for s in self.sp500_symbols if is_valid_ticker(s)]
-            self.nasdaq_symbols = [s for s in self.nasdaq_symbols if is_valid_ticker(s)]
+            self.sp500_symbols = [s.strip().upper() for s in self.sp500_symbols if is_valid_ticker(s)]
+            self.nasdaq_symbols = [s.strip().upper() for s in self.nasdaq_symbols if is_valid_ticker(s)]
             self.all_symbols = list(set(self.sp500_symbols + self.nasdaq_symbols))
             print(f"Loaded {len(self.sp500_symbols)} S&P 500 and {len(self.nasdaq_symbols)} Nasdaq-100 tickers.")
             print(f"Total unique tickers: {len(self.all_symbols)}")
         except Exception as e:
             print(f"Error initializing stock lists: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to a reasonable default list
             self.all_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX']
+            print(f"Using fallback list of {len(self.all_symbols)} stocks")
     
     def fetch_ohlcv(self, symbol: str, days: int = 400):
         """Fetch daily OHLCV data using Yahoo Finance (no rate limits)"""
