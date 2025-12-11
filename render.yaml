@@ -22,5 +22,9 @@ services:
         value: production
       - key: DAILY_TASKS_TOKEN
         sync: false
+      - key: FIREBASE_PROJECT_ID
+        value: turtle-stock
+      # Optional: FIREBASE_CREDENTIALS_PATH if using service account file
+      # For Render, you can also use default credentials via environment variables
     healthCheckPath: /health
     autoDeploy: true 

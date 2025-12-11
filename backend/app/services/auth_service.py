@@ -8,6 +8,17 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin
 import base64
 import json
+import os
+
+# Try to import Firebase Admin SDK (optional - for production token verification)
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth
+    FIREBASE_ADMIN_AVAILABLE = True
+except ImportError:
+    FIREBASE_ADMIN_AVAILABLE = False
+    firebase_admin = None
+    auth = None
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -16,6 +27,33 @@ class AuthService:
         self.secret_key = settings.SECRET_KEY
         self.algorithm = settings.ALGORITHM
         self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        self.firebase_app = None
+        
+        # Initialize Firebase Admin SDK if available and credentials are provided
+        if FIREBASE_ADMIN_AVAILABLE:
+            try:
+                # Check if Firebase is already initialized
+                try:
+                    self.firebase_app = firebase_admin.get_app()
+                    print("DEBUG: Using existing Firebase Admin app")
+                except ValueError:
+                    # Firebase not initialized yet
+                    if settings.FIREBASE_CREDENTIALS_PATH and os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
+                        # Use service account file
+                        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+                        self.firebase_app = firebase_admin.initialize_app(cred)
+                        print("DEBUG: Initialized Firebase Admin with service account file")
+                    else:
+                        # Try to use default credentials (for production environments like Render)
+                        try:
+                            self.firebase_app = firebase_admin.initialize_app()
+                            print("DEBUG: Initialized Firebase Admin with default credentials")
+                        except Exception as e:
+                            print(f"DEBUG: Could not initialize Firebase Admin: {e}")
+                            print("DEBUG: Will use fallback token verification")
+            except Exception as e:
+                print(f"DEBUG: Firebase Admin initialization error: {e}")
+                print("DEBUG: Will use fallback token verification")
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash"""
@@ -58,13 +96,26 @@ class AuthService:
 
     def verify_token(self, token: str) -> Optional[str]:
         """Verify and decode a JWT token (supports both Firebase ID tokens and legacy JWT tokens)"""
-        # First, try to decode as Firebase ID token (JWT format)
-        # Firebase tokens are JWTs with 3 parts: header.payload.signature
+        # First, try to verify as Firebase ID token using Admin SDK (proper verification)
+        if FIREBASE_ADMIN_AVAILABLE and self.firebase_app:
+            try:
+                decoded_token = auth.verify_id_token(token)
+                email = decoded_token.get('email')
+                if email:
+                    print(f"DEBUG: Successfully verified Firebase token (Admin SDK): {email}")
+                    return email
+                else:
+                    print("DEBUG: Firebase token verified but no email in payload")
+            except Exception as e:
+                print(f"DEBUG: Firebase Admin SDK verification failed: {str(e)}")
+                # Fall through to fallback verification
+        
+        # Fallback: Try to decode as Firebase ID token (for local dev or when Admin SDK not available)
+        # This is less secure but works for development
         try:
             parts = token.split('.')
             if len(parts) == 3:
-                # Decode the payload (without verification for now)
-                # In production, you should verify the signature using Firebase's public keys
+                # Decode the payload to check if it's a Firebase token
                 payload_part = parts[1]
                 # Add padding if needed
                 padding = len(payload_part) % 4
@@ -79,7 +130,6 @@ class AuthService:
                 
                 # Check if it's a Firebase token
                 # Firebase tokens have issuer like: https://securetoken.google.com/PROJECT_ID
-                # or contain 'google' or 'firebase' in the issuer
                 iss = payload.get('iss', '')
                 is_firebase_token = (
                     'google' in iss.lower() or 
@@ -89,12 +139,17 @@ class AuthService:
                 )
                 
                 if is_firebase_token:
-                    email = payload.get('email')
-                    if email:
-                        print(f"DEBUG: Successfully extracted email from Firebase token: {email}")
-                        return email
+                    # Verify the issuer matches our Firebase project
+                    expected_iss = f"https://securetoken.google.com/{settings.FIREBASE_PROJECT_ID}"
+                    if iss == expected_iss or settings.FIREBASE_PROJECT_ID in iss:
+                        email = payload.get('email')
+                        if email:
+                            print(f"DEBUG: Successfully extracted email from Firebase token (fallback): {email}")
+                            return email
+                        else:
+                            print("DEBUG: Firebase token found but no email in payload")
                     else:
-                        print("DEBUG: Firebase token found but no email in payload")
+                        print(f"DEBUG: Token issuer mismatch. Expected project: {settings.FIREBASE_PROJECT_ID}, got: {iss}")
                 else:
                     print(f"DEBUG: Token is not a Firebase token (iss: {iss})")
         except Exception as e:

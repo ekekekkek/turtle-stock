@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     # Redis (for caching)
     REDIS_URL: str = "redis://localhost:6379"
     
+    # Firebase Configuration
+    FIREBASE_PROJECT_ID: str = "turtle-stock"
+    # Optional: Path to Firebase service account JSON (for production)
+    # If not set, will use default credentials or verify tokens without Admin SDK
+    FIREBASE_CREDENTIALS_PATH: str = ""
+    
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     
