@@ -23,6 +23,10 @@ class AuthService:
 
     def get_password_hash(self, password: str) -> str:
         """Hash a password"""
+        # Handle empty passwords (for Firebase users)
+        if not password:
+            return "firebase_user_no_password"
+        
         # Bcrypt has a 72-byte limit - truncate if necessary (defensive programming)
         password_bytes = password.encode('utf-8')
         if len(password_bytes) > 72:
@@ -32,7 +36,13 @@ class AuthService:
             while truncated_bytes and (truncated_bytes[-1] & 0b11000000) == 0b10000000:
                 truncated_bytes = truncated_bytes[:-1]
             password = truncated_bytes.decode('utf-8', errors='ignore')
-        return pwd_context.hash(password)
+        
+        try:
+            return pwd_context.hash(password)
+        except ValueError as e:
+            # If bcrypt still fails, use a fallback hash
+            import hashlib
+            return hashlib.sha256(password.encode()).hexdigest()
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         """Create a JWT access token"""
@@ -67,8 +77,18 @@ class AuthService:
                 print(f"DEBUG: Token issuer (iss): {payload.get('iss')}")
                 print(f"DEBUG: Token email: {payload.get('email')}")
                 
-                # Check if it's a Firebase token (has 'firebase' in the payload or 'iss' contains 'firebase')
-                if 'iss' in payload and 'firebase' in payload['iss']:
+                # Check if it's a Firebase token
+                # Firebase tokens have issuer like: https://securetoken.google.com/PROJECT_ID
+                # or contain 'google' or 'firebase' in the issuer
+                iss = payload.get('iss', '')
+                is_firebase_token = (
+                    'google' in iss.lower() or 
+                    'firebase' in iss.lower() or
+                    'securetoken' in iss.lower() or
+                    'firebase' in payload  # Also check if 'firebase' key exists in payload
+                )
+                
+                if is_firebase_token:
                     email = payload.get('email')
                     if email:
                         print(f"DEBUG: Successfully extracted email from Firebase token: {email}")
@@ -76,7 +96,7 @@ class AuthService:
                     else:
                         print("DEBUG: Firebase token found but no email in payload")
                 else:
-                    print(f"DEBUG: Token is not a Firebase token (iss: {payload.get('iss')})")
+                    print(f"DEBUG: Token is not a Firebase token (iss: {iss})")
         except Exception as e:
             # Not a Firebase token, try legacy JWT token
             print(f"DEBUG: Error decoding Firebase token: {str(e)}")
