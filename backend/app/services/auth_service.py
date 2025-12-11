@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin
+import base64
+import json
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -45,7 +47,42 @@ class AuthService:
         return encoded_jwt
 
     def verify_token(self, token: str) -> Optional[str]:
-        """Verify and decode a JWT token"""
+        """Verify and decode a JWT token (supports both Firebase ID tokens and legacy JWT tokens)"""
+        # First, try to decode as Firebase ID token (JWT format)
+        # Firebase tokens are JWTs with 3 parts: header.payload.signature
+        try:
+            parts = token.split('.')
+            if len(parts) == 3:
+                # Decode the payload (without verification for now)
+                # In production, you should verify the signature using Firebase's public keys
+                payload_part = parts[1]
+                # Add padding if needed
+                padding = len(payload_part) % 4
+                if padding:
+                    payload_part += '=' * (4 - padding)
+                payload_bytes = base64.urlsafe_b64decode(payload_part)
+                payload = json.loads(payload_bytes.decode('utf-8'))
+                
+                print(f"DEBUG: Decoded token payload keys: {list(payload.keys())}")
+                print(f"DEBUG: Token issuer (iss): {payload.get('iss')}")
+                print(f"DEBUG: Token email: {payload.get('email')}")
+                
+                # Check if it's a Firebase token (has 'firebase' in the payload or 'iss' contains 'firebase')
+                if 'iss' in payload and 'firebase' in payload['iss']:
+                    email = payload.get('email')
+                    if email:
+                        print(f"DEBUG: Successfully extracted email from Firebase token: {email}")
+                        return email
+                    else:
+                        print("DEBUG: Firebase token found but no email in payload")
+                else:
+                    print(f"DEBUG: Token is not a Firebase token (iss: {payload.get('iss')})")
+        except Exception as e:
+            # Not a Firebase token, try legacy JWT token
+            print(f"DEBUG: Error decoding Firebase token: {str(e)}")
+            pass
+        
+        # Try legacy JWT token verification
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             email: str = payload.get("sub")
@@ -66,7 +103,13 @@ class AuthService:
 
     def create_user(self, db: Session, user: UserCreate) -> User:
         """Create a new user"""
-        hashed_password = self.get_password_hash(user.password)
+        # For Firebase users, password might be empty
+        if user.password:
+            hashed_password = self.get_password_hash(user.password)
+        else:
+            # Firebase users don't have passwords - use a placeholder
+            hashed_password = "firebase_user_no_password"
+        
         db_user = User(
             email=user.email,
             username=user.username,

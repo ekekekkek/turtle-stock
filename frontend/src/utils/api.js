@@ -18,12 +18,25 @@ if (!BASE || BASE === 'http://localhost:8000') {
 
 // Request interceptor for adding auth tokens
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    // Get Firebase ID token instead of localStorage token
+    try {
+      const { auth } = await import('../firebase');
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log('✅ Firebase token added to request:', config.url);
+        } else {
+          console.warn('⚠️ No Firebase token available for:', config.url);
+        }
+      } else {
+        console.warn('⚠️ No current user in Firebase auth for:', config.url);
+      }
+    } catch (error) {
+      console.error('❌ Error getting Firebase ID token:', error);
     }
-    console.log('API Request:', config.method?.toUpperCase(), config.url, config.headers);
+    console.log('API Request:', config.method?.toUpperCase(), config.url, 'Headers:', Object.keys(config.headers));
     return config;
   },
   (error) => {
@@ -38,7 +51,7 @@ api.interceptors.response.use(
     console.log('API Response:', response.status, response.config.url);
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error('API Response Error:', error.response?.status, error.response?.data, error.config?.url);
     
     // Handle network errors
@@ -55,8 +68,16 @@ api.interceptors.response.use(
       // Handle unauthorized access - only redirect if not already on login/register page
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        // Sign out from Firebase if token is invalid
+        try {
+          const { auth } = await import('../firebase');
+          const { signOut } = await import('firebase/auth');
+          if (auth.currentUser) {
+            await signOut(auth);
+          }
+        } catch (signOutError) {
+          console.error('Error signing out:', signOutError);
+        }
         window.location.href = '/login';
       }
     }
@@ -134,20 +155,13 @@ export const watchlistAPI = {
 
 // User-related API functions
 export const userAPI = {
-  // Login
-  login: (credentials) => api.post('/api/auth/login', credentials),
+  // Note: Login and Register are now handled by Firebase Auth
+  // These endpoints may still be used for backend user profile sync
   
-  // Register
-  register: (userData) => api.post('/api/auth/register', userData),
-  
-  // Get user profile
+  // Get user profile (from backend, synced with Firebase)
   getProfile: () => api.get('/api/auth/me'),
   
-  // Logout
-  logout: () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-  },
+  // Logout is now handled by Firebase Auth in AuthContext
 };
 
 // Signals-related API functions
