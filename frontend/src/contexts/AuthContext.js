@@ -10,6 +10,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import toast from 'react-hot-toast';
+import api from '../utils/api';
 
 const AuthContext = createContext();
 
@@ -26,6 +27,38 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const isRegisteringRef = useRef(false);
+  const syncedUsersRef = useRef(new Set()); // Track which users have been synced
+
+  // Sync user with backend database
+  const syncUserWithBackend = async (firebaseUser, userData = null) => {
+    // Skip if already synced in this session
+    if (syncedUsersRef.current.has(firebaseUser.uid)) {
+      return;
+    }
+
+    try {
+      const token = await firebaseUser.getIdToken();
+      const username = userData?.username || firebaseUser.displayName || '';
+      const full_name = userData?.full_name || firebaseUser.displayName || '';
+      
+      // Call backend sync endpoint
+      await api.post('/api/auth/sync', {
+        ...(username && { username }),
+        ...(full_name && { full_name })
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      syncedUsersRef.current.add(firebaseUser.uid);
+      console.log('✅ User synced with backend database');
+    } catch (error) {
+      console.error('❌ Error syncing user with backend:', error);
+      // Don't throw - allow user to continue even if sync fails
+      // The backend will auto-create on first protected endpoint access
+    }
+  };
 
   // Listen for auth state changes
   useEffect(() => {
@@ -41,6 +74,9 @@ export const AuthProvider = ({ children }) => {
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const userData = userDoc.exists() ? userDoc.data() : null;
+          
+          // Sync with backend database
+          await syncUserWithBackend(firebaseUser, userData);
           
           const finalUserData = {
             uid: firebaseUser.uid,
@@ -59,6 +95,14 @@ export const AuthProvider = ({ children }) => {
           }, 50);
         } catch (error) {
           console.error('Error fetching user data:', error);
+          
+          // Still try to sync with backend even if Firestore fails
+          try {
+            await syncUserWithBackend(firebaseUser);
+          } catch (syncError) {
+            console.error('Error syncing with backend:', syncError);
+          }
+          
           // Even if Firestore fetch fails, set basic user info
           const basicUserData = {
             uid: firebaseUser.uid,
@@ -76,6 +120,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAuthenticated(false);
         setLoading(false);
+        syncedUsersRef.current.clear(); // Clear synced users on logout
       }
     });
 
@@ -120,6 +165,24 @@ export const AuthProvider = ({ children }) => {
         capital: 10000
       });
 
+      // Sync with backend database immediately after registration
+      try {
+        const token = await firebaseUser.getIdToken();
+        await api.post('/api/auth/sync', {
+          ...(username && { username }),
+          ...(full_name && { full_name })
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        syncedUsersRef.current.add(firebaseUser.uid);
+        console.log('✅ User synced with backend database after registration');
+      } catch (error) {
+        console.error('❌ Error syncing user with backend after registration:', error);
+        // Don't fail registration if backend sync fails - onAuthStateChanged will retry
+      }
+
       // Don't manually set state here - let onAuthStateChanged handle it
       // This prevents race conditions and ensures consistent state
       // The listener will fire immediately after user creation
@@ -153,7 +216,34 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const { email, password } = credentials;
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Sync with backend database after login
+      try {
+        // Get user data from Firestore if available
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const userData = userDoc.exists() ? userDoc.data() : null;
+        
+        const token = await firebaseUser.getIdToken();
+        const username = userData?.username || '';
+        const full_name = userData?.full_name || '';
+        
+        await api.post('/api/auth/sync', {
+          ...(username && { username }),
+          ...(full_name && { full_name })
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        syncedUsersRef.current.add(firebaseUser.uid);
+        console.log('✅ User synced with backend database after login');
+      } catch (error) {
+        console.error('❌ Error syncing user with backend after login:', error);
+        // Don't fail login if backend sync fails - onAuthStateChanged will retry
+      }
+      
       toast.success('Login successful!');
       return true;
     } catch (error) {

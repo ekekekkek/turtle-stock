@@ -39,4 +39,9 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    email: Optional[str] = None 
+    email: Optional[str] = None
+
+class UserSync(BaseModel):
+    """Schema for syncing user from Firebase"""
+    username: Optional[str] = None
+    full_name: Optional[str] = None 

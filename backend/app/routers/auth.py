@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.deps import get_current_active_user
 from app.services.auth_service import auth_service
-from app.schemas.user import UserCreate, UserResponse, UserLogin, Token, UserUpdate
+from app.schemas.user import UserCreate, UserResponse, UserLogin, Token, UserUpdate, UserSync
 from app.models.user import User
+from typing import Optional
 
 router = APIRouter()
+security = HTTPBearer()
 
 @router.post("/register", response_model=Token)
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -109,4 +112,46 @@ def update_user_settings(
     return {
         "risk_tolerance": current_user.risk_tolerance,
         "capital": current_user.capital
-    } 
+    }
+
+@router.post("/sync", response_model=UserResponse)
+def sync_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+    user_data: Optional[UserSync] = Body(None)
+):
+    """
+    Sync/create user in backend database from Firebase token.
+    This endpoint should be called after Firebase registration/login to ensure
+    the user exists in the backend SQL database.
+    
+    Optional body parameters:
+    - username: Preferred username (will be made unique if taken)
+    - full_name: User's full name
+    """
+    token = credentials.credentials
+    
+    # Extract username and full_name from request body if provided
+    username = user_data.username if user_data else None
+    full_name = user_data.full_name if user_data else None
+    
+    try:
+        user = auth_service.sync_user_from_firebase(
+            db=db,
+            token=token,
+            username=username,
+            full_name=full_name
+        )
+        return user
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        print(f"DEBUG: Error syncing user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to sync user"
+        ) 

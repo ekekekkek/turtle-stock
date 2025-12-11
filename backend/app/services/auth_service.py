@@ -95,17 +95,32 @@ class AuthService:
         return encoded_jwt
 
     def verify_token(self, token: str) -> Optional[str]:
-        """Verify and decode a JWT token (supports both Firebase ID tokens and legacy JWT tokens)"""
-        print(f"DEBUG: verify_token called - FIREBASE_ADMIN_AVAILABLE: {FIREBASE_ADMIN_AVAILABLE}, firebase_app: {self.firebase_app is not None}")
+        """Verify and decode a JWT token (supports both Firebase ID tokens and legacy JWT tokens)
+        Returns the email from the token, or None if verification fails.
+        """
+        token_data = self.verify_token_full(token)
+        return token_data.get('email') if token_data else None
+    
+    def verify_token_full(self, token: str) -> Optional[dict]:
+        """Verify and decode a JWT token, returning full token data including email, name, etc.
+        Returns a dict with user information, or None if verification fails.
+        """
+        print(f"DEBUG: verify_token_full called - FIREBASE_ADMIN_AVAILABLE: {FIREBASE_ADMIN_AVAILABLE}, firebase_app: {self.firebase_app is not None}")
         
         # First, try to verify as Firebase ID token using Admin SDK (proper verification)
         if FIREBASE_ADMIN_AVAILABLE and self.firebase_app:
             try:
                 decoded_token = auth.verify_id_token(token)
                 email = decoded_token.get('email')
+                name = decoded_token.get('name') or decoded_token.get('display_name', '')
                 if email:
                     print(f"DEBUG: Successfully verified Firebase token (Admin SDK): {email}")
-                    return email
+                    return {
+                        'email': email,
+                        'name': name,
+                        'email_verified': decoded_token.get('email_verified', False),
+                        'uid': decoded_token.get('uid')
+                    }
                 else:
                     print("DEBUG: Firebase token verified but no email in payload")
             except Exception as e:
@@ -147,7 +162,12 @@ class AuthService:
                         email = payload.get('email')
                         if email:
                             print(f"DEBUG: Successfully extracted email from Firebase token (fallback): {email}")
-                            return email
+                            return {
+                                'email': email,
+                                'name': payload.get('name') or payload.get('display_name', ''),
+                                'email_verified': payload.get('email_verified', False),
+                                'uid': payload.get('user_id') or payload.get('sub')
+                            }
                         else:
                             print("DEBUG: Firebase token found but no email in payload")
                     else:
@@ -165,7 +185,12 @@ class AuthService:
             email: str = payload.get("sub")
             if email is None:
                 return None
-            return email
+            return {
+                'email': email,
+                'name': '',
+                'email_verified': False,
+                'uid': None
+            }
         except JWTError:
             return None
 
@@ -205,5 +230,53 @@ class AuthService:
     def get_user_by_id(self, db: Session, user_id: int) -> Optional[User]:
         """Get user by ID"""
         return db.query(User).filter(User.id == user_id).first()
+    
+    def sync_user_from_firebase(self, db: Session, token: str, username: Optional[str] = None, full_name: Optional[str] = None) -> User:
+        """Sync/create user in database from Firebase token.
+        If user exists, update their information. If not, create a new user.
+        Returns the user object.
+        """
+        token_data = self.verify_token_full(token)
+        if not token_data or not token_data.get('email'):
+            raise ValueError("Invalid Firebase token: could not extract email")
+        
+        email = token_data['email']
+        firebase_name = token_data.get('name', '') or token_data.get('display_name', '')
+        
+        # Use provided name/username or fall back to Firebase data
+        final_full_name = full_name or firebase_name or ''
+        final_username = username or email.split('@')[0]
+        
+        # Check if user already exists
+        user = self.get_user_by_email(db, email)
+        
+        if user:
+            # Update existing user if needed
+            if final_full_name and not user.full_name:
+                user.full_name = final_full_name
+            if final_username and user.username != final_username:
+                # Check if new username is available
+                existing_user = db.query(User).filter(User.username == final_username, User.id != user.id).first()
+                if not existing_user:
+                    user.username = final_username
+            db.commit()
+            db.refresh(user)
+            return user
+        else:
+            # Create new user
+            # Ensure username is unique
+            base_username = final_username
+            counter = 1
+            while db.query(User).filter(User.username == final_username).first():
+                final_username = f"{base_username}{counter}"
+                counter += 1
+            
+            user_data = UserCreate(
+                email=email,
+                username=final_username,
+                password="",  # No password needed for Firebase users
+                full_name=final_full_name
+            )
+            return self.create_user(db, user_data)
 
 auth_service = AuthService() 
